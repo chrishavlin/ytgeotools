@@ -2,9 +2,9 @@ import numpy as np
 from ytgeotools.typing import all_numbers
 
 
-def sphere2cart(phi: all_numbers,
-                theta: all_numbers,
-                radius: all_numbers) -> all_numbers:
+def sphere2cart(
+    phi: all_numbers, theta: all_numbers, radius: all_numbers
+) -> all_numbers:
     """
     seis_model.sphere2cart(phi,theta,radius)
 
@@ -31,7 +31,9 @@ def sphere2cart(phi: all_numbers,
     return (x, y, z)
 
 
-def cart2sphere(x: all_numbers, y: all_numbers, z: all_numbers, geo: bool = True) -> all_numbers:
+def cart2sphere(
+    x: all_numbers, y: all_numbers, z: all_numbers, geo: bool = True
+) -> all_numbers:
     """
     seis_model.cart2sphere(x,y,z,geo=True)
 
@@ -53,15 +55,17 @@ def cart2sphere(x: all_numbers, y: all_numbers, z: all_numbers, geo: bool = True
 
     xy = x ** 2 + y ** 2
     R = np.sqrt(xy + z ** 2)
-    lat = np.arctan2(np.sqrt(xy), z) * 180. / np.pi
-    lon = np.arctan2(y, x) * 180. / np.pi
+    lat = np.arctan2(np.sqrt(xy), z) * 180.0 / np.pi
+    lon = np.arctan2(y, x) * 180.0 / np.pi
     if geo:
-        lat = lat - 90.  # equator is at 0, +90 is N pole
+        lat = lat - 90.0  # equator is at 0, +90 is N pole
 
     return (R, lat, lon)
 
 
-def geosphere2cart(lat: all_numbers, lon: all_numbers, radius: all_numbers) -> all_numbers:
+def geosphere2cart(
+    lat: all_numbers, lon: all_numbers, radius: all_numbers
+) -> all_numbers:
     """
     transformation from latitude, longitude to to cartesian
 
@@ -81,14 +85,12 @@ def geosphere2cart(lat: all_numbers, lon: all_numbers, radius: all_numbers) -> a
     (x,y,z) : tuple of cartesian x,y,z in same units as radius
     """
 
-
-    phi = ( 90. - lat ) * np.pi / 180. # lat is now deg from North
+    phi = (90.0 - lat) * np.pi / 180.0  # lat is now deg from North
 
     if isinstance(lon, np.ndarray):
-        lon[lon < 0.0] = lon[lon < 0.0]+360.
-    elif lon < 0.:
-        lon = lon+360.
-    theta = lon * np.pi / 180.
+        lon[lon < 0.0] = lon[lon < 0.0] + 360.0
+    elif lon < 0.0:
+        lon = lon + 360.0
+    theta = lon * np.pi / 180.0
 
     return sphere2cart(phi, theta, radius)
-

@@ -1,4 +1,4 @@
-from ytgeotools.datasets import XarrayGeoSpherical
+from ytgeotools.seismology.datasets import XarrayGeoSpherical
 
 filename = "/home/chris/hdd/data/yt_data/IRIS_models/NA07_percent.nc"
 
