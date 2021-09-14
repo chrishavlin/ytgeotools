@@ -16,7 +16,7 @@ ytgeotools
 
 
 
-some tools for analysis of 3d geophysical datasets
+some tools for analysis of 3d geophysical datasets including integration with yt and yt_idv. 
 
 
 * Free software: MIT license
