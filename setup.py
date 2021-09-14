@@ -10,7 +10,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ["yt", "netcdf4", "h5py", "scipy", "geopandas", "yt-idv", "cartopy", "shapely", "xarray"]
+requirements = ["yt", "netcdf4", "h5py", "scipy", "geopandas", "yt-idv", "cartopy", "shapely", "xarray", "sklearn"]
 
 test_requirements = ['pytest>=3', ]
 

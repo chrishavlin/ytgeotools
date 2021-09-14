@@ -1,12 +1,8 @@
-import geopandas as gpd
 import pandas as pd
-from shapely.geometry import Polygon, Point
-from shapely.ops import cascaded_union
-import numpy as np
-from . import mapping as MS, pointData as pdd, dataManager as dm
+from ytgeotools import mapping as MS, point_data as pdd, data_manager as dm
 
 
-class volc(object):
+class Dataset(object):
     def __init__(self, dataDir=None, use_neg_lons=False, **kwargs):
         self.db = dm.filesystemDB(dataDir)
         self.file = self.db.fullpath("earthchem_download_90561.csv")
@@ -19,7 +15,7 @@ class volc(object):
         df = pd.read_csv(self.file, sep="|", low_memory=False)
         df = df.drop_duplicates(subset=["lat", "lon", "age"])
         # limit by age
-        # note: 'age' column is the calculate age, 'age_min' and 'age_max' are the
+        # note: 'age' column is the calculated age, 'age_min' and 'age_max' are the
         # min/max ages for the calculated age. The age_min, age_max inputs to
         # this function act on 'age' column.
         if max_age_Ma is not None:
@@ -75,4 +71,4 @@ class volc(object):
 
         boundingPoly = pdd.boundingPolies(df, boundary_df, radius_deg=radius_deg)
 
-        return (boundingPoly.df, boundingPoly.df_gp, boundingPoly.df_bound)
+        return boundingPoly.df, boundingPoly.df_gp, boundingPoly.df_bound
