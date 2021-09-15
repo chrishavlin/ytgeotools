@@ -1,24 +1,23 @@
 import numpy as np
 import os
 
+from ytgeotools.mapping import validate_lons
 
-class etopo(object):
+
+class Etopo(object):
     """
     class for loading dem topo files from https://www.ngdc.noaa.gov/mgg/global/global.html
     """
 
-    def __init__(self, filename, db=None, loadFile=True):
-        self.db = setDb(db)
-        if os.path.isfile(filename):
-            self.filename = filename
-        else:
-            self.filename = self.db.fullpath(filename)
+    def __init__(self, filename, loadFile=True, use_negative_lons=False):
 
+        self.filename = filename
         self.filetype = filename.split(".")[-1]
         self.topo = None
-        self.lats = None
-        self.lons = None
+        self.latitude = None
+        self.longitude = None
         self.topo_range = None
+        self.use_negative_lons = use_negative_lons
 
         if loadFile:
             if self.filetype == "asc":
@@ -50,10 +49,13 @@ class etopo(object):
         )
 
         # calculate lat, lon arrays
-        self.lats = np.linspace(
-            header_dict["lat2"], header_dict["lat1"], header_dict["nrows"]
+        self.latitude = np.linspace(
+            header_dict["lat2"], header_dict["lat1"], int(header_dict["nrows"])
         )
-        self.lons = np.linspace(
-            header_dict["lon1"], header_dict["lon2"], header_dict["ncols"]
+        raw_lons = np.linspace(
+            header_dict["lon1"], header_dict["lon2"], int(header_dict["ncols"])
         )
+        self.longitude = validate_lons(raw_lons, self.use_negative_lons)
         self.topo_range = header_dict
+
+    _topo_df

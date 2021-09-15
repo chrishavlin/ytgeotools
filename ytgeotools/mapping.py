@@ -222,8 +222,7 @@ def filter_by_bounds(df, b_df, return_interior=True, crs=default_crs):
     df : DataFrame or GeoDataFrame
         dataframe of points, can be pandas or geopandas dataframe.
     b_df : GeoDataFrame
-        dataframe of polygons. If None (default), will use Colorado Plateau
-        with affinity scale of 2, smoothing factor of 5.
+        dataframe of polygons.
     return_interior : boolean
         will only return points inside bounding polygons if True (default)
 
