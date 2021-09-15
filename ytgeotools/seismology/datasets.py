@@ -3,9 +3,9 @@ from numpy.typing import ArrayLike
 from typing import Union, Type
 import xarray as xr
 from unyt import unyt_quantity
-from yt import load_uniform_grid as lug
-from ytgeotools.coordinate_transformations import geosphere2cart
 from ytgeotools.ytgeotools import Dataset
+from ytgeotools.coordinate_transformations import geosphere2cart
+from scipy import spatial
 
 
 class GeoSpherical(Dataset):
@@ -26,6 +26,7 @@ class GeoSpherical(Dataset):
             for idim, dim in enumerate(coord_order)
         }
         self.max_radius = max_radius
+        self._interp_trees = {}
         super().__init__(data, coords)
 
     def cartesian_coords(self) -> tuple[ArrayLike]:
@@ -41,7 +42,27 @@ class GeoSpherical(Dataset):
 
         return geosphere2cart(lat, lon, radius)
 
-    def interpolate_to_uniform_cartesian(self, field_subset: list = None, N: int = 500):
+    def interpolate_to_uniform_cartesian(
+        self,
+        fields: list,
+        N: int = 50,
+        max_dist: Union[int, float] = 100,
+        interpChunk: int = 500000,
+        recylce_trees: bool = False,
+        return_yt: bool = False,
+    ):
+        """
+        moves geo-spherical data (radius/depth, lat, lon) to earth-centered
+        cartesian coordinates using a kdtree with inverse distance weighting (IDW)
+
+
+        max_dist : int or float
+            the max distance away for nearest neighbor search (default 100)
+        interpChunk : int
+            the chunk size for querying the kdtree (default 500000)
+        recylce_trees : boolean
+            if True, will store the kdtree(s) generated (default False)
+        """
 
         x, y, z = self.cartesian_coords()  # the actual xyz at which we have data
 
@@ -51,13 +72,117 @@ class GeoSpherical(Dataset):
 
         wids = np.abs(cart_bbox[:, 1] - cart_bbox[:, 0])
         dx = wids.min() / N
-        Ngrid = np.floor(wids / dx)
+        Ngrid = np.floor(wids / dx).astype(int)
 
-        xyz_int = [
-            np.linspace(cart_bbox[0, d], cart_bbox[1, d], Ngrid[d]) for d in range(3)
-        ]
+        fillval = np.nan
+        xdata = x.ravel()
+        ydata = y.ravel()
+        zdata = z.ravel()
+        trees = {}
+        interpd = {}
+        for field in fields:
+            data = getattr(self, field).ravel()
+
+            if recylce_trees and field in self._interp_trees:
+                trees[field] = self._interp_trees[field]
+            else:
+                x_fi = xdata[data != fillval]
+                y_fi = ydata[data != fillval]
+                z_fi = zdata[data != fillval]
+                data = data[data != fillval]
+                xyz = np.column_stack((x_fi, y_fi, z_fi))
+                print("building kd tree for " + field)
+                trees[field] = {"tree": spatial.cKDTree(xyz), "data": data}
+                print("    kd tree built")
+
+            interpd[field] = np.full((Ngrid[0], Ngrid[1], Ngrid[2]), np.nan)
 
         # interpolate the field data from x, y, z to xyz_int
+        xyz = [
+            np.linspace(cart_bbox[d, 0], cart_bbox[d, 1], Ngrid[d]) for d in range(3)
+        ]
+        xdata, ydata, zdata = np.meshgrid(*xyz, indexing="ij")
+        orig_shape = xdata.shape
+        xdata = xdata.ravel(order="C")
+        ydata = ydata.ravel(order="C")
+        zdata = zdata.ravel(order="C")
+
+        parallel_query = False
+        if parallel_query:
+            raise NotImplementedError
+        else:
+            interpd = query_trees(
+                xdata,
+                ydata,
+                zdata,
+                interpChunk,
+                fields,
+                trees,
+                interpd,
+                orig_shape,
+                max_dist,
+            )
+
+        if recylce_trees:
+            self._interp_trees.update(trees)
+
+        if return_yt:
+            coords = {
+                d: {"values": xyz[d], "name": dim} for d, dim in zip(range(3), "xyz")
+            }
+            return Dataset(
+                interpd,
+                coords,
+            ).load_uniform_grid()
+
+        if len(interpd) == 1:
+            interpd = interpd[fields[0]]
+        return *xyz, interpd
+
+
+def query_trees(
+    xdata, ydata, zdata, interpChunk, fields, trees, interpd, orig_shape, max_dist
+):
+
+    # query the tree at each new grid point and weight nearest neighbors
+    # by inverse distance. proceed in chunks.
+    N_grid = len(xdata)
+    print("querying kdtree on interpolated grid")
+    chunk = interpChunk
+    N_chunks = int(N_grid / chunk) + 1
+    print("breaking into " + str(N_chunks) + " chunks")
+    for i_chunk in range(0, N_chunks):
+        print("   processing chunk " + str(i_chunk + 1) + " of " + str(N_chunks))
+        i_0 = i_chunk * chunk
+        i_1 = i_0 + chunk
+        if i_1 > N_grid:
+            i_1 = N_grid
+        pts = np.column_stack((xdata[i_0:i_1], ydata[i_0:i_1], zdata[i_0:i_1]))
+        indxs = np.array(range(i_0, i_1))  # the linear indeces of this chunk
+        for fi in fields:
+            (dists, tree_indxs) = trees[fi]["tree"].query(
+                pts, k=8, distance_upper_bound=max_dist
+            )
+
+            # remove points with all infs (no NN's within max_dist)
+            m = np.all(~np.isinf(dists), axis=1)
+            tree_indxs = tree_indxs[m]
+            indxs = indxs[m]
+            dists = dists[m]
+
+            # IDW with array manipulation
+            # Build weighting matrix
+            wts = 1 / dists
+            wts = wts / np.sum(wts, axis=1)[:, np.newaxis]  # shape (N,8)
+            vals = trees[fi]["data"][tree_indxs]  # shape (N,8)
+            vals = vals * wts
+            vals = np.sum(vals, axis=1)  # shape (N,)
+
+            # store in proper indeces
+            full_indxs = np.unravel_index(indxs, orig_shape, order="C")
+            interpd[fi][full_indxs] = vals
+
+    return interpd
 
 
 class XarrayGeoSpherical(GeoSpherical):
@@ -115,16 +240,3 @@ class XarrayGeoSpherical(GeoSpherical):
             coord_order=coord_order,
             max_radius=max_radius,
         )
-
-
-def load_uniform_grid(ds: Type[Dataset], *args, **kwargs):
-
-    data = ds.data_dict()
-    sizes = data[list(data.keys())[0]].shape
-    dims = tuple(ds._coord_order)
-    geometry = (ds.geometry, (dims))
-    return lug(data, sizes, 1.0, *args, bbox=ds.bbox, geometry=geometry, **kwargs)
-
-
-# ds = yt.load_uniform_grid(data, sizes, 1.0, geometry=("internal_geographic", dims),
-#                           bbox=bbox)

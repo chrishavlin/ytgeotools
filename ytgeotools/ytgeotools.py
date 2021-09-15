@@ -1,13 +1,21 @@
 """Main module."""
 import numpy as np
-from yt import load_uniform_grid
+from yt import load_uniform_grid as lug
+from typing import Type
 
 # abstract class
 class Dataset:
 
-    geometry = None
+    geometry = "cartesian"
 
     def __init__(self, data: dict, coords: dict):
+        """
+        coords : dict
+            {0: {"values": xvals, "name":x},
+             1: {"values": yvals, "name":y},
+             2: {"values": zvals, "name":z},
+            }
+        """
 
         self.fields = list(data.keys())
 
@@ -35,3 +43,12 @@ class Dataset:
 
     def load_uniform_grid(self):
         return load_uniform_grid(self)
+
+
+def load_uniform_grid(ds: Type[Dataset], *args, **kwargs):
+
+    data = ds.data_dict()
+    sizes = data[list(data.keys())[0]].shape
+    dims = tuple(ds._coord_order)
+    geometry = (ds.geometry, (dims))
+    return lug(data, sizes, 1.0, *args, bbox=ds.bbox, geometry=geometry, **kwargs)
