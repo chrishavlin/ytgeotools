@@ -222,4 +222,3 @@ def calcKmeans(best_N, X1vals, X2vals):
     Xcluster = np.column_stack((X1, X2))
     clustering = KMeans(n_clusters=best_N).fit(Xcluster)
     return {"X1": X1, "X2": X2, "clustering": clustering}
-

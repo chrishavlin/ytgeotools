@@ -1,69 +1,119 @@
-from ytgeotools import data_manager as dm
 from shapely.geometry import Polygon, Point
 from shapely import affinity as aff
 import pandas as pd
 import geopandas as gpd
 import numpy as np
 from shapely.ops import cascaded_union
+import os
+
 
 default_crs = {"init": "epsg:4326"}
-preferredproj = "robinson"
 
 
-def setDb(db=None):
-    if type(db) is str or db is None:
-        return dm.filesystemDB(dataDir=db)
+def validate_lons(lons, use_negative_lons=False):
+    if use_negative_lons:
+        lons[lons > 180] = lons[lons > 180] - 360.0
     else:
-        return db
+        lons[lons < 0] = lons[lons < 0] + 360.0
+    return lons
 
 
-class ColoradoPlateau(object):
-    def __init__(self, db=None, CP_scales=[1], smooth_fac=None, use_neg_lons=False):
-        self.db = setDb(db)
-        self.file = self.db.fullpath("ColoradoPlateauBoundary.csv")
-        self.CP = pd.read_csv(self.file)
-        if use_neg_lons:
-            self.CP.loc[self.CP.lon > 180, "lon"] = (
-                self.CP.loc[self.CP.lon > 180, "lon"] - 360.0
+class OnDiskGeometry:
+    def __init__(
+        self,
+        filename: str,
+        crs: dict = default_crs,
+        ftype: str = None,
+        latname: str = "latitude",
+        lonname: str = "longitude",
+        use_negative_lons: bool = False,
+    ):
+        self.filename = filename
+        self.crs = crs
+        self.use_negative_lons = use_negative_lons
+        self.lonname = lonname
+        self.latname = latname
+
+        if ftype is None:
+            ftype = os.path.splitext(filename)[-1].replace(".", "")
+
+        read_engines = {
+            "csv": self.read_csv,
+        }
+        self._read = read_engines[ftype]
+        self.ftype = ftype
+
+    def read_csv(self, *args, **kwargs):
+        return pd.read_csv(self.filename, *args, **kwargs)
+
+    def _validate_lons(self):
+        self.df[self.lonname] = validate_lons(
+            self.df[self.lonname], self.use_negative_lons
+        )
+
+
+class PolygonFile(OnDiskGeometry):
+    def __init__(
+        self,
+        filename: str,
+        *args,
+        crs: dict = default_crs,
+        ftype: str = None,
+        latname: str = "latitude",
+        lonname: str = "longitude",
+        use_negative_lons: bool = False,
+        description: str = None,
+        smooth_factor: int = 1,
+        affine_scale: int = 1,
+        **kwargs
+    ):
+
+        super().__init__(
+            filename,
+            crs=crs,
+            ftype=ftype,
+            latname=latname,
+            lonname=lonname,
+            use_negative_lons=use_negative_lons,
+        )
+
+        self.df = self._read(*args, **kwargs)
+        self._validate_lons()
+
+        if description is None:
+            description = filename
+        self.description = description
+
+        self.bounding_polygon = self.build_gpd_df(smooth_factor, affine_scale)
+
+    def build_gpd_df(self, smooth_factor: float = 1, affine_scale: float = 1):
+
+        poly = Polygon(
+            [[p[0], p[1]] for p in zip(self.df[self.lonname], self.df[self.latname])]
+        )
+
+        if affine_scale != 1:
+            poly = aff.scale(poly, xfact=affine_scale, yfact=affine_scale)
+
+        if smooth_factor != 1:
+            poly = poly.buffer(smooth_factor, join_style=1).buffer(
+                -smooth_factor, join_style=1
             )
-        else:
-            self.CP.loc[self.CP.lon < 0, "lon"] = (
-                self.CP.loc[self.CP.lon < 0, "lon"] + 360.0
-            )
-        (self.CP_gpd, self.CP_polies) = self.buildCPgpd(CP_scales, smooth_fac)
-
-    def buildCPgpd(self, CP_scales=[1], smooth_fac=None):
-        poly = Polygon([[p[0], p[1]] for p in zip(self.CP.lon, self.CP.lat)])
-        self.CP_raw_poly = poly
-        # Dom_gp= gpd.GeoDataFrame(crs=crs)
 
         gpd_rows = []
-        polies = []
-        sid = 0
-        for sc in CP_scales:
-            CP_sc = aff.scale(poly, xfact=sc, yfact=sc)
-            if smooth_fac is not None:
-                CP_sc = CP_sc.buffer(smooth_fac, join_style=1).buffer(
-                    -smooth_fac, join_style=1
-                )
-            polies.append(CP_sc)
-            # Dom_gp=Dom_gp.append({'shape_id':sid,'geometry':CP_sc,'sc':sc},ignore_index=True)
-            gpd_rows.append({"shape_id": sid, "geometry": CP_sc, "sc": sc})
-            sid = sid + 1
-
-        Dom_gp = gpd.GeoDataFrame(gpd_rows, crs=crs)
-        return Dom_gp, polies
+        gpd_rows.append({"geometry": poly, "description": self.description})
+        gpd_df = gpd.GeoDataFrame(gpd_rows, crs=self.crs)
+        return gpd_df
 
 
-def build_bounding_df(latitudes, longitudes, crs = {"init": "epsg:4326"}, description="bounding_poly"):
+def build_bounding_df(
+    latitudes, longitudes, crs={"init": "epsg:4326"}, description="bounding_poly"
+):
 
     poly = Polygon([[p[0], p[1]] for p in zip(longitudes, latitudes)])
 
-    gpd_rows = [
-        {"shape_id": 0, "geometry": poly, "description": description}
-    ]
+    gpd_rows = [{"shape_id": 0, "geometry": poly, "description": description}]
     return gpd.GeoDataFrame(gpd_rows, crs=crs), poly
-
 
 
 class BoundingPolies(object):
@@ -97,9 +147,9 @@ class BoundingPolies(object):
         self.b_df = b_df
 
         self.crs = crs
-        self._buildExtents(radius_deg=radius_deg)
+        self._build_extents(radius_deg=radius_deg)
 
-    def _buildExtents(self, radius_deg=0.5):
+    def _build_extents(self, radius_deg=0.5):
         """builds bounding extent (bounding polygon of all points)
 
         Parameters
@@ -120,7 +170,7 @@ class BoundingPolies(object):
 
         if self.b_df is not None:
             df = self.df_raw.copy(deep=True)
-            df = filterByBounds(df, self.b_df)
+            df = filter_by_bounds(df, self.b_df)
             self.df = df
         else:
             self.df = self.df_raw
@@ -164,7 +214,7 @@ def circ(c_lat_y, c_lon_x, radius_deg, max_arc_length_deg=0.01):
     return Polygon(zip(lon_pts, lat_pts))
 
 
-def filterByBounds(df, b_df, return_interior=True, crs=default_crs):
+def filter_by_bounds(df, b_df, return_interior=True, crs=default_crs):
     """finds dataframe points within polygons of a second dataframe
 
     Parameters

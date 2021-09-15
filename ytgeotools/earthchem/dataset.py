@@ -5,24 +5,29 @@ from ytgeotools.mapping import BoundingPolies, default_crs
 
 def _apply_filter(df, filter: dict):
     col = filter["column"]
-    if filter['comparison'] == "==":
-        df = df[df[col] == filter['value']]
-    elif filter['comparison'] == "<=":
-        df = df[df[col] <= filter['value']]
-    elif filter['comparison'] == "<":
-        df = df[df[col] < filter['value']]
-    elif filter['comparison'] == ">=":
-        df = df[df[col] >= filter['value']]
-    elif filter['comparison'] == ">":
-        df = df[df[col] > filter['value']]
+    if filter["comparison"] == "==":
+        df = df[df[col] == filter["value"]]
+    elif filter["comparison"] == "<=":
+        df = df[df[col] <= filter["value"]]
+    elif filter["comparison"] == "<":
+        df = df[df[col] < filter["value"]]
+    elif filter["comparison"] == ">=":
+        df = df[df[col] >= filter["value"]]
+    elif filter["comparison"] == ">":
+        df = df[df[col] > filter["value"]]
     return df
 
 
 class Dataset(object):
-    def __init__(self, filename, use_neg_lons=False, initial_filters=None, drop_duplicates_by=["lat", "lon", "age"]):
+    def __init__(
+        self,
+        filename,
+        use_neg_lons=False,
+        initial_filters=None,
+        drop_duplicates_by=["lat", "lon", "age"],
+    ):
         self.file = filename
         self.drop_duplicates_by = drop_duplicates_by
-
 
         self.filters = []
         # format of filter
@@ -59,7 +64,9 @@ class Dataset(object):
         else:
             df.loc[df.lon < 0, "lon"] = df.loc[df.lon < 0, "lon"] + 360.0
 
-        df = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.lon, df.lat), crs=default_crs)
+        df = gpd.GeoDataFrame(
+            df, geometry=gpd.points_from_xy(df.lon, df.lat), crs=default_crs
+        )
 
         return df, bounds
 
