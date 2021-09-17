@@ -52,9 +52,9 @@ class DataManager:
         if location == "fullpath":
             if os.path.isfile(os.path.abspath(filename)):
                 return os.path.abspath(filename)
-        elif location == "ytconfig":
+        elif location == "ytconfig" and self.yt_test_data_dir:
             return join_then_check_path(filename, self.yt_test_data_dir)
-        elif location == "envvar":
+        elif location == "envvar" and self.envvar_dir:
             return join_then_check_path(filename, self.envvar_dir)
         return None
 

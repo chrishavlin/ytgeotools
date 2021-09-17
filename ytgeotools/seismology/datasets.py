@@ -53,6 +53,8 @@ class GeoSpherical(Dataset):
         interpChunk: int = 500000,
         recylce_trees: bool = False,
         return_yt: bool = False,
+        rescale_coords: bool = False,
+        apply_functions: list = None,
     ):
         """
         moves geo-spherical data (radius/depth, lat, lon) to earth-centered
@@ -128,6 +130,15 @@ class GeoSpherical(Dataset):
 
         if recylce_trees:
             self._interp_trees.update(trees)
+
+        if rescale_coords:
+            max_dist = wids.max()
+            for dim in range(3):
+                xyz[dim] = (xyz[dim] - cart_bbox[dim, 0]) / max_dist
+
+        for funchandle in apply_functions:
+            for key, vals in interpd.items():
+                interpd[key] = funchandle(vals)
 
         if return_yt:
             coords = {

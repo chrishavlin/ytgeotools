@@ -107,3 +107,7 @@ ENV/
 
 # image files
 *.png
+
+# temp files
+*.swp
+*imgui.ini
