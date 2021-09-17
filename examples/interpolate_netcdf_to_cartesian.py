@@ -1,9 +1,10 @@
-from ytgeotools.seismology.datasets import XarrayGeoSpherical
 import matplotlib.pyplot as plt
-from numpy import isnan
 import yt
+from numpy import isnan
 
-filename = "/home/chavlin/hdd/data/yt_data/IRIS_models/NA07_percent.nc"
+from ytgeotools.seismology.datasets import XarrayGeoSpherical
+
+filename = "IRIS/NA07_percent.nc"
 ds = XarrayGeoSpherical(filename)
 x, y, z, dvs = ds.interpolate_to_uniform_cartesian(["dvs"])
 

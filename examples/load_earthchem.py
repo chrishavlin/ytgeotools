@@ -1,5 +1,6 @@
-from ytgeotools.earthchem import Dataset
 import matplotlib.pyplot as plt
+
+from ytgeotools.earthchem import Dataset
 from ytgeotools.mapping import build_bounding_df
 
 file = "/home/chavlin/hdd/data/LAB_obs/data/earthchem/earthchem_download_90561.csv"
@@ -22,11 +23,12 @@ plt.show()
 
 # find the volcanic extent within an initial bounding polygon
 
-from ytgeotools.earthchem import Dataset
 import matplotlib.pyplot as plt
+
+from ytgeotools.earthchem import Dataset
 from ytgeotools.mapping import build_bounding_df
 
-file = "/home/chavlin/hdd/data/LAB_obs/data/earthchem/earthchem_download_90561.csv"
+file = "data/earthchem/earthchem_download_90561.csv"
 
 # load everything
 echem = Dataset(file)
@@ -37,7 +39,9 @@ lons = [250, 260, 260, 255, 250, 250]
 b_df, _ = build_bounding_df(lats, lons)
 
 # find the volcanic extent
-plain_df, gp_df, df_bound = echem.build_volcanic_extent(boundary_df=b_df, radius_deg=0.2)
+plain_df, gp_df, df_bound = echem.build_volcanic_extent(
+    boundary_df=b_df, radius_deg=0.2
+)
 
 df_bound.plot()
 plt.show()

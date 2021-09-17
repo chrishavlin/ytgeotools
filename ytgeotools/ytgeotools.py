@@ -1,7 +1,9 @@
 """Main module."""
+from typing import Type
+
 import numpy as np
 from yt import load_uniform_grid as lug
-from typing import Type
+
 
 # abstract class
 class Dataset:

@@ -1,11 +1,14 @@
+from typing import Type, Union
+
 import numpy as np
-from numpy.typing import ArrayLike
-from typing import Union, Type
 import xarray as xr
-from unyt import unyt_quantity
-from ytgeotools.ytgeotools import Dataset
-from ytgeotools.coordinate_transformations import geosphere2cart
+from numpy.typing import ArrayLike
 from scipy import spatial
+from unyt import unyt_quantity
+
+from ytgeotools.coordinate_transformations import geosphere2cart
+from ytgeotools.data_manager import data_manager as _dm
+from ytgeotools.ytgeotools import Dataset
 
 
 class GeoSpherical(Dataset):
@@ -198,6 +201,7 @@ class XarrayGeoSpherical(GeoSpherical):
         max_radius: Type[unyt_quantity] = unyt_quantity(6371.0, "km"),
     ):
 
+        filename = _dm.validate_file(filename)
         with xr.open_dataset(filename) as ds:
 
             coord_list = list(ds.coords)

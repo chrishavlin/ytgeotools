@@ -1,11 +1,11 @@
-from shapely.geometry import Polygon, Point
-from shapely import affinity as aff
-import pandas as pd
-import geopandas as gpd
-import numpy as np
-from shapely.ops import cascaded_union
 import os
 
+import geopandas as gpd
+import numpy as np
+import pandas as pd
+from shapely import affinity as aff
+from shapely.geometry import Point, Polygon
+from shapely.ops import cascaded_union
 
 default_crs = {"init": "epsg:4326"}
 

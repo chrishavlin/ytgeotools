@@ -1,5 +1,7 @@
-import pandas as pd
 import geopandas as gpd
+import pandas as pd
+
+from ytgeotools.data_manager import data_manager as _dm
 from ytgeotools.mapping import BoundingPolies, default_crs
 
 
@@ -26,7 +28,7 @@ class Dataset(object):
         initial_filters=None,
         drop_duplicates_by=["lat", "lon", "age"],
     ):
-        self.file = filename
+        self.file = _dm.validate_file(filename)
         self.drop_duplicates_by = drop_duplicates_by
 
         self.filters = []

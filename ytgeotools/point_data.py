@@ -1,13 +1,13 @@
 """
 class for processing point data
 """
-import numpy as np
 import geopandas as gpd
-import pandas as pd
-from shapely.geometry import Point, MultiPoint, Polygon, LineString
-
-from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from shapely.geometry import LineString, MultiPoint, Point, Polygon
+from sklearn.cluster import KMeans
+
 from . import mapping as MS
 
 

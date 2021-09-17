@@ -1,6 +1,6 @@
 import numpy as np
-import os
 
+from ytgeotools.data_manager import data_manager as _dm
 from ytgeotools.mapping import validate_lons
 
 
@@ -11,7 +11,7 @@ class Etopo(object):
 
     def __init__(self, filename, loadFile=True, use_negative_lons=False):
 
-        self.filename = filename
+        self.filename = _dm.validate_file(filename)
         self.filetype = filename.split(".")[-1]
         self.topo = None
         self.latitude = None
