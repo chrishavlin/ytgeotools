@@ -7,14 +7,14 @@ file = "data/earthchem/earthchem_download_90561.csv"
 
 # load with initial filters
 initial_filters = [
-    {"column": "age", "comparison": "<=", "value": 100},
+    {"column": "age", "comparison": "<=", "value": 30},
 ]
 echem = Dataset(file, initial_filters=initial_filters)
 
 _, volcanic_bound_df, _ = echem.build_volcanic_extent(radius_deg=0.5)
 
 
-vs_file = "IRIS/GYPSUM_percent.nc"
+vs_file = "IRIS/wUS-SH-2010_percent.nc"
 ds = XarrayGeoSpherical(vs_file)
 
 surface_gpd = ds.surface_gpd
@@ -32,6 +32,7 @@ nvolc = profs.shape[0]
 n_nvolc = profs_nv.shape[0]
 titlestr = f"N volc: {nvolc}, N non volc: {n_nvolc}"
 
+# plot the mean and 1-std spread in each region
 dvs_mean = np.mean(profs, axis=0)
 dvs_std = np.std(profs, axis=0)
 dvs_nv_mean = np.mean(profs_nv, axis=0)

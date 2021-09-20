@@ -6,6 +6,8 @@ import pandas as pd
 from shapely import affinity as aff
 from shapely.geometry import Point, Polygon
 from shapely.ops import cascaded_union
+from pandas import isnull as pd_isnull
+from ytgeotools.data_manager import data_manager
 
 default_crs = {"init": "epsg:4326"}
 
@@ -28,14 +30,14 @@ class OnDiskGeometry:
         lonname: str = "longitude",
         use_negative_lons: bool = False,
     ):
-        self.filename = filename
+        self.filename = data_manager.validate_file(filename)
         self.crs = crs
         self.use_negative_lons = use_negative_lons
         self.lonname = lonname
         self.latname = latname
 
         if ftype is None:
-            ftype = os.path.splitext(filename)[-1].replace(".", "")
+            ftype = os.path.splitext(self.filename)[-1].replace(".", "")
 
         read_engines = {
             "csv": self.read_csv,
@@ -260,3 +262,31 @@ def filter_by_bounds(df, b_df, return_interior=True, crs=default_crs):
         return df_s[~pd.isnull(df_s["shape_id"])]
     else:
         return df_s
+
+
+def successive_joins(df_left, df_right_list, drop_null=False, drop_inside=False):
+
+    df = df_left.copy()
+
+    if type(drop_null) is bool:
+        drop_null = [drop_null] * len(df_right_list)
+
+    if type(drop_inside) is bool:
+        drop_inside = [drop_inside] * len(df_right_list)
+
+    for df_r, dnull, dins in zip(df_right_list, drop_null, drop_inside):
+
+        if dnull and dins:
+            raise ValueError("Only one of drop_na and drop_inside can be True")
+
+        df = gpd.sjoin(df, df_r, how="left", op="intersects")
+
+        if dnull:
+            df = df[~pd_isnull(df["index_right"])]
+        if dins:
+            df = df[pd_isnull(df["index_right"])]
+
+        if len(df_right_list) > 1:
+            df = df.drop(columns=["index_right"])
+
+    return df

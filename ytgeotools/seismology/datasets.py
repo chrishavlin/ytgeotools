@@ -9,7 +9,7 @@ from unyt import unyt_quantity
 from ytgeotools.coordinate_transformations import geosphere2cart
 from ytgeotools.data_manager import data_manager as _dm
 from ytgeotools.ytgeotools import Dataset
-from ytgeotools.mapping import default_crs, validate_lons
+from ytgeotools.mapping import default_crs, validate_lons, successive_joins
 import geopandas as gpd
 from pandas import isnull as pd_isnull
 
@@ -192,43 +192,28 @@ class GeoSpherical(Dataset):
             self._surface_gpd = df
         return self._surface_gpd
 
-    def filter_surface_gpd(self, df_gpd, drop_null=False, drop_inside=False):
-
-        if isinstance(df_gpd, gpd.GeoDataFrame) is False:
-            raise ValueError("df_gpd must be a GeoDataFrame")
-
+    def filter_surface_gpd(self, df_gpds, drop_null=False, drop_inside=False):
         df = self.surface_gpd
-        df_j = gpd.sjoin(df, df_gpd, how="left", op="intersects")
-
-        if drop_null and drop_inside:
-            raise ValueError("Only one of drop_na and drop_inside can be True")
-        if drop_null:
-            df_j = df_j[~pd_isnull(df_j["index_right"])]
-        if drop_inside:
-            df_j = df_j[pd_isnull(df_j["index_right"])]
-
-        return df_j
+        return successive_joins(df,
+                                df_gpds,
+                                drop_null=drop_null,
+                                drop_inside=drop_inside)
 
     def get_profiles(
         self,
         field: str,
-        df_gpd: Type[gpd.GeoDataFrame] = None,
+        df_gpds: list = None,
         depth_mask=None,
-        invert_selection=False,
+        drop_null=False,
+        drop_inside=True,
     ):
 
-        if df_gpd is not None:
-            if invert_selection:
-                drop_null = False
-                drop_inside = True
-            else:
-                drop_null = True
-                drop_inside = False
+        if df_gpds is not None:
             surface_df = self.filter_surface_gpd(
-                df_gpd,
-                drop_null=drop_null,
-                drop_inside=drop_inside,
-            )
+                    df_gpds,
+                    drop_null=drop_null,
+                    drop_inside=drop_inside,
+                )
         else:
             surface_df = self.surface_gpd
 
