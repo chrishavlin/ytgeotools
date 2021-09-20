@@ -2,7 +2,7 @@ import geopandas as gpd
 import pandas as pd
 
 from ytgeotools.data_manager import data_manager as _dm
-from ytgeotools.mapping import BoundingPolies, default_crs
+from ytgeotools.mapping import BoundingPolies, default_crs, validate_lons
 
 
 def _apply_filter(df, filter: dict):
@@ -23,10 +23,12 @@ def _apply_filter(df, filter: dict):
 class Dataset(object):
     def __init__(
         self,
-        filename,
-        use_neg_lons=False,
-        initial_filters=None,
-        drop_duplicates_by=["lat", "lon", "age"],
+        filename: str,
+        use_neg_lons: bool = False,
+        initial_filters: list = None,
+        drop_duplicates_by: list = ["latitude", "longitude", "age"],
+        lonname: str = "lon",
+        latname: str = "lat",
     ):
         self.file = _dm.validate_file(filename)
         self.drop_duplicates_by = drop_duplicates_by
@@ -42,14 +44,21 @@ class Dataset(object):
             self.filters += initial_filters
 
         self.use_neg_lons = use_neg_lons
-        self.df, self.bounds = self.loadData()
+        self.lonname = lonname
+        self.latname = latname
+        self.df, self.bounds = self.load_data()
 
-    def loadData(self, filters: list = None):
+    def load_data(self, filters: list = None):
 
         if filters is None:
             filters = []
 
         df = pd.read_csv(self.file, sep="|", low_memory=False)
+        df = df.rename(columns={self.lonname: "longitude", self.latname: "latitude"})
+
+        lonvals = df["longitude"].values
+        lonvals = validate_lons(lonvals, use_negative_lons=self.use_neg_lons)
+        df["longitude"] = lonvals
 
         if self.drop_duplicates_by:
             df = df.drop_duplicates(subset=self.drop_duplicates_by)
@@ -57,17 +66,13 @@ class Dataset(object):
         for filter_dict in self.filters + filters:
             df = _apply_filter(df, filter_dict)
 
-        bounds = {
-            "lat": [df.lat.min(), df.lat.max()],
-            "lon": [df.lon.min(), df.lon.max()],
-        }
-        if self.use_neg_lons:
-            df.loc[df.lon > 180, "lon"] = df.loc[df.lon > 180, "lon"] - 360.0
-        else:
-            df.loc[df.lon < 0, "lon"] = df.loc[df.lon < 0, "lon"] + 360.0
+        dimnames = "latitude", "longitude"
+        bounds = {dim: [df[dim].min(), df[dim].max()] for dim in dimnames}
 
         df = gpd.GeoDataFrame(
-            df, geometry=gpd.points_from_xy(df.lon, df.lat), crs=default_crs
+            df,
+            geometry=gpd.points_from_xy(df["longitude"], df["latitude"]),
+            crs=default_crs,
         )
 
         return df, bounds

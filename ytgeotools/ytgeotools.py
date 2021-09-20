@@ -38,6 +38,10 @@ class Dataset:
         self._coord_hash = {dim: coords[dim]["name"] for dim in range(3)}
         self._coord_hash_r = {coords[dim]["name"]: dim for dim in range(3)}
 
+    def get_coord(self, name: str):
+        dim_index = self._coord_hash_r[name]
+        return self.coords[dim_index]
+
     def data_dict(self, field_subset: list = None) -> dict:
         if field_subset is None:
             field_subset = self.fields

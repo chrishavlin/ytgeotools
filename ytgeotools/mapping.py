@@ -142,11 +142,21 @@ class BoundingPolies(object):
 
     """
 
-    def __init__(self, df, b_df=None, radius_deg=0.5, crs=default_crs):
+    def __init__(
+        self,
+        df,
+        b_df=None,
+        radius_deg=0.5,
+        crs=default_crs,
+        lonname="longitude",
+        latname="latitude",
+    ):
         self.df_raw = df
         self.b_df = b_df
 
         self.crs = crs
+        self.lonname = lonname
+        self.latname = latname
         self._build_extents(radius_deg=radius_deg)
 
     def _build_extents(self, radius_deg=0.5):
@@ -177,9 +187,11 @@ class BoundingPolies(object):
             df = self.df
 
         polies = []
+        lons = self.lonname
+        lats = self.latname
         for rowid, row in df.iterrows():
             polies.append(
-                Polygon(circ(row["lat"], row["lon"], radius_deg, radius_deg / 10))
+                Polygon(circ(row[lats], row[lons], radius_deg, radius_deg / 10))
             )
 
         self.df_gp = gpd.GeoDataFrame(geometry=polies, crs=self.crs)

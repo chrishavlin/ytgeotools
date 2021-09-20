@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from ytgeotools.earthchem import Dataset
 from ytgeotools.mapping import build_bounding_df
 
-file = "/home/chavlin/hdd/data/LAB_obs/data/earthchem/earthchem_download_90561.csv"
+file = "data/earthchem/earthchem_download_90561.csv"
 
 # load everything
 echem = Dataset(file)

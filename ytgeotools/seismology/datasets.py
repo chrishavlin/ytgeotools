@@ -9,6 +9,9 @@ from unyt import unyt_quantity
 from ytgeotools.coordinate_transformations import geosphere2cart
 from ytgeotools.data_manager import data_manager as _dm
 from ytgeotools.ytgeotools import Dataset
+from ytgeotools.mapping import default_crs, validate_lons
+import geopandas as gpd
+from pandas import isnull as pd_isnull
 
 
 class GeoSpherical(Dataset):
@@ -19,16 +22,21 @@ class GeoSpherical(Dataset):
         longitude: ArrayLike,
         depth: ArrayLike,
         coord_order: list = ["latitude", "longitude", "depth"],
+        use_neg_lons: bool = False,
         max_radius: float = 6371.0,
+        crs: dict = default_crs,
     ):
 
         self.max_radius = max_radius
+
+        longitude = validate_lons(longitude, use_negative_lons=use_neg_lons)
         coord_init = {"latitude": latitude, "longitude": longitude, "depth": depth}
         coords = {
             idim: {"values": coord_init[dim], "name": dim}
             for idim, dim in enumerate(coord_order)
         }
         self.max_radius = max_radius
+        self.crs = crs
         self._interp_trees = {}
         super().__init__(data, coords)
 
@@ -153,6 +161,95 @@ class GeoSpherical(Dataset):
             interpd = interpd[fields[0]]
         return *xyz, interpd
 
+    _latlon_grid = None
+
+    @property
+    def latlon_grid(self):
+        if self._latlon_grid is None:
+            lon = self.get_coord("longitude")
+            lat = self.get_coord("latitude")
+
+            long, latg = np.meshgrid(lon, lat)
+            self._latlon_grid = {"longitude": long, "latitude": latg}
+
+        return self._latlon_grid["latitude"], self._latlon_grid["longitude"]
+
+    _surface_gpd = None
+
+    @property
+    def surface_gpd(self):
+
+        if self._surface_gpd is None:
+            lat, lg = self.latlon_grid
+            lg = lg.ravel()
+            lat = lat.ravel()
+
+            df = gpd.GeoDataFrame(
+                {"latitude": lat, "longitude": lg},
+                geometry=gpd.points_from_xy(lg, lat),
+                crs=self.crs,
+            )
+            self._surface_gpd = df
+        return self._surface_gpd
+
+    def filter_surface_gpd(self, df_gpd, drop_null=False, drop_inside=False):
+
+        if isinstance(df_gpd, gpd.GeoDataFrame) is False:
+            raise ValueError("df_gpd must be a GeoDataFrame")
+
+        df = self.surface_gpd
+        df_j = gpd.sjoin(df, df_gpd, how="left", op="intersects")
+
+        if drop_null and drop_inside:
+            raise ValueError("Only one of drop_na and drop_inside can be True")
+        if drop_null:
+            df_j = df_j[~pd_isnull(df_j["index_right"])]
+        if drop_inside:
+            df_j = df_j[pd_isnull(df_j["index_right"])]
+
+        return df_j
+
+    def get_profiles(
+        self,
+        field: str,
+        df_gpd: Type[gpd.GeoDataFrame] = None,
+        depth_mask=None,
+        invert_selection=False,
+    ):
+
+        if df_gpd is not None:
+            if invert_selection:
+                drop_null = False
+                drop_inside = True
+            else:
+                drop_null = True
+                drop_inside = False
+            surface_df = self.filter_surface_gpd(
+                df_gpd,
+                drop_null=drop_null,
+                drop_inside=drop_inside,
+            )
+        else:
+            surface_df = self.surface_gpd
+
+        raw_profiles = []
+        coords = []
+        lon = self.get_coord("longitude")
+        lat = self.get_coord("latitude")
+
+        var = getattr(self, field)
+        for rowid, row in surface_df.iterrows():
+            lon_id = np.where(lon == row["longitude"])[0][0]
+            lat_id = np.where(lat == row["latitude"])[0][0]
+            if depth_mask is None:
+                fvars = var[:, lat_id, lon_id]
+            else:
+                fvars = var[depth_mask, lat_id, lon_id]
+
+            raw_profiles.append(fvars[:])
+            coords.append((row["latitude"], row["longitude"]))
+        return np.array(raw_profiles), coords
+
 
 def query_trees(
     xdata, ydata, zdata, interpChunk, fields, trees, interpd, orig_shape, max_dist
@@ -210,6 +307,7 @@ class XarrayGeoSpherical(GeoSpherical):
         field_subset: Union[list] = None,
         coord_aliases: dict = None,
         max_radius: Type[unyt_quantity] = unyt_quantity(6371.0, "km"),
+        use_neg_lons: bool = False,
     ):
 
         filename = _dm.validate_file(filename)
@@ -254,4 +352,5 @@ class XarrayGeoSpherical(GeoSpherical):
             depth,
             coord_order=coord_order,
             max_radius=max_radius,
+            use_neg_lons=use_neg_lons,
         )
