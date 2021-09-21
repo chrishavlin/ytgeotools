@@ -233,7 +233,9 @@ class GeoSpherical(Dataset):
 
             raw_profiles.append(fvars[:])
             coords.append((row["latitude"], row["longitude"]))
-        return np.array(raw_profiles), coords
+
+        coords = np.array(coords)
+        return np.array(raw_profiles), coords[:, 1], coords[:, 0]
 
 
 def query_trees(

@@ -111,3 +111,4 @@ ENV/
 # temp files
 *.swp
 *imgui.ini
+*dask-worker-space*
