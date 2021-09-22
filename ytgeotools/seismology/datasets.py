@@ -40,18 +40,83 @@ class GeoSpherical(Dataset):
         self._interp_trees = {}
         super().__init__(data, coords)
 
+
+    _cartesian_coords = None
+    _cartesian_bbox = None
+
+    @property
     def cartesian_coords(self) -> tuple[ArrayLike]:
         "returns 3d arrays representing earth-centered cartesian coordinates of every grid point"
 
-        cmesh = np.meshgrid(
-            self.coords[0], self.coords[1], self.coords[2], indexing="ij"
-        )
+        if self._cartesian_coords is None:
+            cmesh = np.meshgrid(
+                self.coords[0], self.coords[1], self.coords[2], indexing="ij"
+            )
 
-        radius = self.max_radius - cmesh[self._coord_hash_r["depth"]]
-        lat = cmesh[self._coord_hash_r["latitude"]]
-        lon = cmesh[self._coord_hash_r["longitude"]]
+            radius = self.max_radius - cmesh[self._coord_hash_r["depth"]]
+            lat = cmesh[self._coord_hash_r["latitude"]]
+            lon = cmesh[self._coord_hash_r["longitude"]]
 
-        return geosphere2cart(lat, lon, radius)
+            x, y, z = geosphere2cart(lat, lon, radius)
+            self._cartesian_coords = x, y, z
+
+        return self._cartesian_coords
+
+    @property
+    def cartesian_bbox(self):
+        if self._cartesian_bbox is None:
+            x, y, z = self.cartesian_coords
+            self._cartesian_bbox = np.array([[d.min(), d.max()] for d in [x, y, z]])
+        return self._cartesian_bbox
+
+    def convert_to_cartesian(self, latitude, longitude, depth, rescale):
+        radius = self.max_radius - depth
+
+        x, y, z = geosphere2cart(latitude, longitude, radius)
+        if rescale:
+            cart_bbox = self.cartesian_bbox
+            wids = np.abs(cart_bbox[:, 1] - cart_bbox[:, 0])
+            x = (x - cart_bbox[0, 0]) / wids[0]
+            y = (y - cart_bbox[1, 0]) / wids[1]
+            z = (z - cart_bbox[2, 0]) / wids[2]
+
+        return x, y, z
+
+    def get_bounding_edges(self, points_per_edge=3, cartesian=False, rescale=False):
+
+        minlat = self.bbox[self._coord_hash_r["latitude"]][0]
+        maxlat = self.bbox[self._coord_hash_r["latitude"]][1]
+        minlon = self.bbox[self._coord_hash_r["longitude"]][0]
+        maxlon = self.bbox[self._coord_hash_r["longitude"]][1]
+        mindep = self.bbox[self._coord_hash_r["depth"]][0]
+        maxdep = self.bbox[self._coord_hash_r["depth"]][1]
+
+        def edge_line(lat0, lon0, dep0, lat1, lon1, dep1):
+            xyz = np.column_stack(
+                [np.linspace(lon0, lon1, ppe),
+                np.linspace(lat0, lat1, ppe),
+                np.linspace(dep0, dep1, ppe),]
+            )
+
+            if cartesian:
+                x, y, z = self.convert_to_cartesian(xyz[:,1], xyz[:,0], xyz[:, 2], rescale=rescale)
+                xyz = np.column_stack([x, y, z])
+
+            return xyz
+
+        ppe = points_per_edge
+        curves = []
+        for dep in [mindep, maxdep]:
+            curves.append(edge_line(minlat, minlon, dep, maxlat, minlon, dep))
+            curves.append(edge_line(maxlat, minlon, dep, maxlat, maxlon, dep))
+            curves.append(edge_line(maxlat, maxlon, dep, minlat, maxlon, dep))
+            curves.append(edge_line(minlat, maxlon, dep, minlat, minlon, dep))
+
+        for lat in [minlat, maxlat]:
+            curves.append(edge_line(lat, minlon, mindep, lat, minlon, maxdep))
+            curves.append(edge_line(lat, maxlon, mindep, lat, maxlon, maxdep))
+
+        return curves
 
     def interpolate_to_uniform_cartesian(
         self,
@@ -77,12 +142,10 @@ class GeoSpherical(Dataset):
             if True, will store the kdtree(s) generated (default False)
         """
 
-        x, y, z = self.cartesian_coords()  # the actual xyz at which we have data
+        x, y, z = self.cartesian_coords  # the actual xyz at which we have data
+        cart_bbox = self.cartesian_bbox
 
         # drop points at which we don't have data
-
-        cart_bbox = np.array([[d.min(), d.max()] for d in [x, y, z]])
-
         wids = np.abs(cart_bbox[:, 1] - cart_bbox[:, 0])
         dx = wids.min() / N
         Ngrid = np.floor(wids / dx).astype(int)

@@ -1,7 +1,3 @@
-import matplotlib.pyplot as plt
-import yt
-from numpy import isnan
-from functools import partial
 import numpy as np
 import yt_idv
 from ytgeotools.seismology.datasets import XarrayGeoSpherical
