@@ -13,7 +13,8 @@ filename = "IRIS/NWUS11-S_percent.nc"
 ds = XarrayGeoSpherical(filename)
 ds_yt = ds.interpolate_to_uniform_cartesian(
     ["dvs"],
-    N=250,
+    N=50,
+    max_dist=50,
     return_yt=True,
     rescale_coords=True,
     apply_functions=[refill, np.abs],

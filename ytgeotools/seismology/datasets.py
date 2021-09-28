@@ -46,7 +46,7 @@ class GeoSpherical(Dataset):
     _cartesian_bbox = None
 
     @property
-    def cartesian_coords(self) -> tuple[ArrayLike]:
+    def cartesian_coords(self) -> tuple:
         "returns 3d arrays representing earth-centered cartesian coordinates of every grid point"
 
         if self._cartesian_coords is None:
