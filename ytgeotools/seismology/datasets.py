@@ -203,9 +203,9 @@ class GeoSpherical(Dataset):
             self._interp_trees.update(trees)
 
         if rescale_coords:
-            max_dist = wids.max()
+            max_wid = wids.max()
             for dim in range(3):
-                xyz[dim] = (xyz[dim] - cart_bbox[dim, 0]) / max_dist
+                xyz[dim] = (xyz[dim] - cart_bbox[dim, 0]) / max_wid
 
         for funchandle in apply_functions:
             for key, vals in interpd.items():

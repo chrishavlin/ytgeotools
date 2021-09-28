@@ -1,8 +1,7 @@
 from ytgeotools.seismology.datasets import XarrayGeoSpherical
 from ytgeotools.seismology.collections import ProfileCollection
-from dask.distributed import Client
 import matplotlib.pyplot as plt
-
+import numpy as np
 
 vs_file = "IRIS/wUS-SH-2010_percent.nc"
 ds = XarrayGeoSpherical(vs_file)
@@ -23,16 +22,14 @@ for i in range(3):
     plt.plot(kmeans_stats[i]["one_sigma_min"], depth, color=c[i], linestyle="--")
     plt.plot(kmeans_stats[i]["one_sigma_max"], depth, color=c[i], linestyle="--")
 plt.gca().invert_yaxis()
-plt.show()
 
 
-
-
-
-c = Client(threads_per_worker=1, n_workers=4)
-
+print("calculating kmeans inertia vs number of clusters")
+plt.figure()
 c_range = range(1, 11)
 models, inertia = P.multi_kmeans_fit(c_range)
 
 plt.plot(c_range, inertia)
+plt.xlabel("number of clusters")
+plt.ylabel("kmeans inertia")
 plt.show()
