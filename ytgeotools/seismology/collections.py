@@ -1,9 +1,9 @@
 from tslearn.clustering import TimeSeriesKMeans
 from dask import delayed, compute
 from ytgeotools.mapping import default_crs
-from geopandas import GeoDataFrame, points_from_xy
+from geopandas import GeoDataFrame, points_from_xy, sjoin
 import numpy as np
-
+from ytgeotools.mapping import BoundingPolies
 
 class ProfileCollection:
     def __init__(self, profiles, depth, x, y, crs=default_crs):
@@ -53,6 +53,7 @@ class DepthSeriesKMeans(TimeSeriesKMeans):
     def __init__(
         self,
         profile_collection,
+        radius_deg=0.2,
         n_clusters=3,
         max_iter=50,
         tol=1e-06,
@@ -82,6 +83,7 @@ class DepthSeriesKMeans(TimeSeriesKMeans):
         )
         self.profile_collection = profile_collection
         self._fit_exists = False
+        self.radius_deg = radius_deg
 
     def fit(self):
         super().fit(self.profile_collection.profiles)
@@ -91,12 +93,41 @@ class DepthSeriesKMeans(TimeSeriesKMeans):
     def get_classified_coordinates(self):
         p = self.profile_collection
         return GeoDataFrame(
-            {"labels": self.labels_}, geometry=points_from_xy(p.x, p.y), crs=p.crs
+                            {"labels": self.labels_,
+                             "latitude": p.y,
+                             "longitude": p.x},
+                            geometry=points_from_xy(p.x, p.y),
+                            crs=p.crs
         )
 
+    _bounding_polygons = None
+
+    @property
+    def bounding_polygons(self):
+        if self._bounding_polygons is None:
+            df = self.get_classified_coordinates()
+            geoms = []
+            geomdata = {'label': []}
+            for iclust in range(self.n_clusters):
+                df_members = df[df.labels == iclust]
+                bounds = BoundingPolies(df_members, radius_deg=self.radius_deg)
+                geoms.append(bounds.df_bound.geometry[0])
+                geomdata['label'].append(iclust)
+
+            crs = self.profile_collection.crs
+            df = GeoDataFrame(geomdata, geometry=geoms, crs=crs)
+            self._bounding_polygons = df
+        return self._bounding_polygons
+
+    def set_bounding_radius(self, radius_deg):
+        if radius_deg != self.radius_deg:
+            self._bounding_polygons = None
+        self.radius_deg = radius_deg
+
     @requires_fit
-    def get_stats_in_labels(self, df_gpd):
-        df = self.get_classified_coordinates()
+    def classify_points(self, df_gpd):
+        b_df = self.bounding_polygons
+        return sjoin(df_gpd, b_df, how='left', op='intersects')
 
     @requires_fit
     def depth_stats(self):

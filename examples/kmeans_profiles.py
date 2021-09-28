@@ -6,7 +6,7 @@ vs_file = "IRIS/wUS-SH-2010_percent.nc"
 ds = XarrayGeoSpherical(vs_file)
 P = ds.get_profiles("dvs")
 
-model = DepthSeriesKMeans(P, n_clusters=5)
+model = DepthSeriesKMeans(P, n_clusters=3)
 model.fit()
 df = model.get_classified_coordinates()
 df.plot("labels")
