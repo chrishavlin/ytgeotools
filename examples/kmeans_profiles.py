@@ -1,33 +1,30 @@
 from ytgeotools.seismology.datasets import XarrayGeoSpherical
-from ytgeotools.seismology.collections import ProfileCollection
+from ytgeotools.seismology.collections import DepthSeriesKMeans
 import matplotlib.pyplot as plt
-import numpy as np
 
 vs_file = "IRIS/wUS-SH-2010_percent.nc"
 ds = XarrayGeoSpherical(vs_file)
-profs, x, y = ds.get_profiles("dvs")
-depth = ds.get_coord("depth")
-P = ProfileCollection(profs, depth, x, y, crs=ds.crs)
+P = ds.get_profiles("dvs")
 
-model = P.fit_kmeans(3)
-df = P.get_classified_coords(model)
+model = DepthSeriesKMeans(P, n_clusters=5)
+model.fit()
+df = model.get_classified_coordinates()
 df.plot("labels")
 
-kmeans_stats = P.kmeans_depth_stats(model)
-
+kmeans_stats = model.depth_stats()
 plt.figure()
 c = ["r", "g", "b", "c", "m"]
-for i in range(3):
-    plt.plot(model.cluster_centers_[i, :], depth, color=c[i])
-    plt.plot(kmeans_stats[i]["one_sigma_min"], depth, color=c[i], linestyle="--")
-    plt.plot(kmeans_stats[i]["one_sigma_max"], depth, color=c[i], linestyle="--")
+for i in range(model.n_clusters):
+    minvals = kmeans_stats[i]["two_sigma_min"]
+    maxvals = kmeans_stats[i]["two_sigma_max"]
+    plt.plot(model.cluster_centers_[i, :], model.profile_collection.depth, color=c[i])
 plt.gca().invert_yaxis()
 
 
 print("calculating kmeans inertia vs number of clusters")
 plt.figure()
 c_range = range(1, 11)
-models, inertia = P.multi_kmeans_fit(c_range)
+models, inertia = model.multi_kmeans_fit(c_range)
 
 plt.plot(c_range, inertia)
 plt.xlabel("number of clusters")

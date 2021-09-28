@@ -4,10 +4,12 @@ from ytgeotools.seismology.datasets import XarrayGeoSpherical
 from yt_idv.scene_components.blocks import BlockRendering
 from yt_idv.scene_data.block_collection import BlockCollection
 
+
 def refill(vals):
     vals[np.isnan(vals)] = 0.0
     vals[vals > 0] = 0.0
     return vals
+
 
 def refill2(vals):
     vals[np.isnan(vals)] = 0.0

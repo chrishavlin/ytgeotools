@@ -10,6 +10,8 @@ from ytgeotools.coordinate_transformations import geosphere2cart
 from ytgeotools.data_manager import data_manager as _dm
 from ytgeotools.ytgeotools import Dataset
 from ytgeotools.mapping import default_crs, validate_lons, successive_joins
+from ytgeotools.geo_points.datasets import _GeoPoint
+from ytgeotools.seismology.collections import ProfileCollection
 import geopandas as gpd
 from pandas import isnull as pd_isnull
 
@@ -39,7 +41,6 @@ class GeoSpherical(Dataset):
         self.crs = crs
         self._interp_trees = {}
         super().__init__(data, coords)
-
 
     _cartesian_coords = None
     _cartesian_bbox = None
@@ -93,13 +94,17 @@ class GeoSpherical(Dataset):
 
         def edge_line(lat0, lon0, dep0, lat1, lon1, dep1):
             xyz = np.column_stack(
-                [np.linspace(lon0, lon1, ppe),
-                np.linspace(lat0, lat1, ppe),
-                np.linspace(dep0, dep1, ppe),]
+                [
+                    np.linspace(lon0, lon1, ppe),
+                    np.linspace(lat0, lat1, ppe),
+                    np.linspace(dep0, dep1, ppe),
+                ]
             )
 
             if cartesian:
-                x, y, z = self.convert_to_cartesian(xyz[:,1], xyz[:,0], xyz[:, 2], rescale=rescale)
+                x, y, z = self.convert_to_cartesian(
+                    xyz[:, 1], xyz[:, 0], xyz[:, 2], rescale=rescale
+                )
                 xyz = np.column_stack([x, y, z])
 
             return xyz
@@ -215,14 +220,11 @@ class GeoSpherical(Dataset):
             coords = {
                 d: {"values": xyz[d], "name": dim} for d, dim in zip(range(3), "xyz")
             }
-            return Dataset(
-                interpd,
-                coords,
-            ).load_uniform_grid()
+            return Dataset(interpd, coords,).load_uniform_grid()
 
         if len(interpd) == 1:
             interpd = interpd[fields[0]]
-        return *xyz, interpd
+        return xyz[0], xyz[1], xyz[2], interpd
 
     _latlon_grid = None
 
@@ -257,10 +259,9 @@ class GeoSpherical(Dataset):
 
     def filter_surface_gpd(self, df_gpds, drop_null=False, drop_inside=False):
         df = self.surface_gpd
-        return successive_joins(df,
-                                df_gpds,
-                                drop_null=drop_null,
-                                drop_inside=drop_inside)
+        return successive_joins(
+            df, df_gpds, drop_null=drop_null, drop_inside=drop_inside
+        )
 
     def get_profiles(
         self,
@@ -269,19 +270,17 @@ class GeoSpherical(Dataset):
         depth_mask=None,
         drop_null=False,
         drop_inside=True,
-    ):
+    ) -> ProfileCollection:
 
         if df_gpds is not None:
             surface_df = self.filter_surface_gpd(
-                    df_gpds,
-                    drop_null=drop_null,
-                    drop_inside=drop_inside,
-                )
+                df_gpds, drop_null=drop_null, drop_inside=drop_inside,
+            )
         else:
             surface_df = self.surface_gpd
 
         raw_profiles = []
-        coords = []
+        crds = []
         lon = self.get_coord("longitude")
         lat = self.get_coord("latitude")
 
@@ -295,10 +294,17 @@ class GeoSpherical(Dataset):
                 fvars = var[depth_mask, lat_id, lon_id]
 
             raw_profiles.append(fvars[:])
-            coords.append((row["latitude"], row["longitude"]))
+            crds.append((row["latitude"], row["longitude"]))
 
-        coords = np.array(coords)
-        return np.array(raw_profiles), coords[:, 1], coords[:, 0]
+        crds = np.array(crds)
+
+        return ProfileCollection(
+            np.array(raw_profiles),
+            self.get_coord("depth"),
+            crds[:, 1],
+            crds[:, 0],
+            crs=self.crs,
+        )
 
 
 def query_trees(

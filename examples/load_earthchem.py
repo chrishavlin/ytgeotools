@@ -1,19 +1,19 @@
 import matplotlib.pyplot as plt
 
-from ytgeotools.earthchem import Dataset
+from ytgeotools.geo_points.datasets import EarthChem
 from ytgeotools.mapping import build_bounding_df
 
-file = "data/earthchem/earthchem_download_90561.csv"
+file = "data/geo_points/earthchem_download_90561.csv"
 
 # load everything
-echem = Dataset(file)
+echem = EarthChem(file)
 
 # load with initial filters
 initial_filters = [
     {"column": "age", "comparison": "<=", "value": 50},
     {"column": "rock_name", "comparison": "==", "value": "RHYOLITE"},
 ]
-echem_filtered = Dataset(file, initial_filters=initial_filters)
+echem_filtered = EarthChem(file, initial_filters=initial_filters)
 
 # apply additional filters after load
 plt.hist(echem.df.age)
@@ -25,13 +25,13 @@ plt.show()
 
 import matplotlib.pyplot as plt
 
-from ytgeotools.earthchem import Dataset
+from ytgeotools.geo_points import EarthChem
 from ytgeotools.mapping import build_bounding_df
 
-file = "data/earthchem/earthchem_download_90561.csv"
+file = "data/geo_points/earthchem_download_90561.csv"
 
 # load everything
-echem = Dataset(file)
+echem = EarthChem(file)
 
 # create a polygon and geodataframe
 lats = [20, 20, 30, 35, 30, 20]
