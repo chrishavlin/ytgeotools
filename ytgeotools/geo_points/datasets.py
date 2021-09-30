@@ -1,5 +1,6 @@
 import geopandas as gpd
 import pandas as pd
+from geopandas import GeoDataFrame
 from abc import ABC, abstractmethod
 
 from ytgeotools.data_manager import data_manager as _dm
@@ -162,6 +163,10 @@ class EarthChem(CSVData):
 
         """
 
-        boundingPoly = BoundingPolies(self.df, b_df=boundary_df, radius_deg=radius_deg)
+        boundingPoly = BoundingPolies(self.df,
+                                      b_df=boundary_df,
+                                      radius_deg=radius_deg)
+        vbf = boundingPoly.df_bound
+        vbf = GeoDataFrame(geometry=vbf.geometry, crs=self.crs)
 
-        return boundingPoly.df, boundingPoly.df_gp, boundingPoly.df_bound
+        return boundingPoly.df, boundingPoly.df_gp, vbf

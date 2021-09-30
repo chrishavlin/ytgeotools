@@ -1,9 +1,12 @@
 from tslearn.clustering import TimeSeriesKMeans
 from dask import delayed, compute
 from ytgeotools.mapping import default_crs
-from geopandas import GeoDataFrame, points_from_xy, sjoin
+from geopandas import GeoDataFrame, points_from_xy, sjoin, GeoSeries
 import numpy as np
 from ytgeotools.mapping import BoundingPolies
+from shapely.ops import cascaded_union
+from typing import Type
+
 
 class ProfileCollection:
     def __init__(self, profiles, depth, x, y, crs=default_crs):
@@ -12,6 +15,23 @@ class ProfileCollection:
         self.x = x
         self.y = y
         self.crs = crs
+
+    _surface_df = None
+
+    @property
+    def surface_df(self):
+        if self._surface_df is None:
+            df = GeoDataFrame({"longitude": self.x,
+                               "latitude": self.y},
+                              geometry=points_from_xy(self.x, self.y),
+                              crs=self.crs)
+            self._surface_df = df
+        return self._surface_df
+
+    def get_surface_union(self, *args, **kwargs):
+        bp = BoundingPolies(self.surface_df, *args, **kwargs)
+        return GeoDataFrame(geometry=bp.df_bound.geometry, crs=self.crs)
+
 
 
 def fit_kmeans(profile_collection, n_clusters=3, **kwargs):
@@ -50,9 +70,16 @@ def requires_fit(func):
 
 
 class DepthSeriesKMeans(TimeSeriesKMeans):
+
+    depth_range = None
+    depth_mask = None
+    depth = None
+
     def __init__(
         self,
-        profile_collection,
+        profile_collection: Type[ProfileCollection],
+        depth_min=None,
+        depth_max=None,
         radius_deg=0.2,
         n_clusters=3,
         max_iter=50,
@@ -81,12 +108,26 @@ class DepthSeriesKMeans(TimeSeriesKMeans):
             random_state=random_state,
             init=init,
         )
+
         self.profile_collection = profile_collection
+        self._set_depth_attrs(depth_min, depth_max)
         self._fit_exists = False
         self.radius_deg = radius_deg
 
+    def _set_depth_attrs(self, depth_min, depth_max):
+
+        d = self.profile_collection.depth
+        if depth_min is None:
+            depth_min = d.min()
+        if depth_max is None:
+            depth_max = d.max()
+
+        self.depth_range = (depth_min, depth_max)
+        self.depth_mask = (d >= depth_min) & (d <= depth_max)
+        self.depth = d[self.depth_mask]
+
     def fit(self):
-        super().fit(self.profile_collection.profiles)
+        super().fit(self.profile_collection.profiles[:, self.depth_mask])
         self._fit_exists = True
 
     @requires_fit
@@ -135,8 +176,8 @@ class DepthSeriesKMeans(TimeSeriesKMeans):
         cstats = {}
         for lab in range(self.n_clusters):
             label_mask = self.labels_ == lab
-            vals = self.profile_collection.profiles[label_mask, :]
-
+            p = self.profile_collection.profiles
+            vals = p[label_mask, :][:,  self.depth_mask]
             cval = self.cluster_centers_[lab, :].squeeze()
             stdvals = np.std(vals, axis=0)
             labstats = {

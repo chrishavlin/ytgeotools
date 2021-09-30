@@ -124,12 +124,17 @@ class BoundingPolies(object):
     Parameters
     ----------
     df : DataFrame or GeoDataFrame
-        dataframe of point data, must have 'lat' and 'lon' fields
+        dataframe of point data
     b_df : GeoDataFrame
         bounding GeoDataFrame to limit df initially, can be None (default)
-    **kwargs
-        'radius_deg' float
-            the radius for circles around each point
+    radius_deg : float
+        the radius for circles around each point
+    lonname: str
+        name of longitude field in the dataframe (default "longitude")
+    latname: str
+        name of latitude field in the dataframe (default "latitude")
+    crs : dict
+        coordinate reference dictionary, default is ytgeotools.mapping.default_crs
 
     Attributes
     ----------
@@ -259,7 +264,7 @@ def filter_by_bounds(df, b_df, return_interior=True, crs=default_crs):
     # spatial join of the two geodataframes
     df_s = gpd.sjoin(b_df, df_gpd, how="right", op="intersects")
     if return_interior:
-        return df_s[~pd.isnull(df_s["shape_id"])]
+        return df_s[~pd.isnull(df_s["index_left"])]
     else:
         return df_s
 
