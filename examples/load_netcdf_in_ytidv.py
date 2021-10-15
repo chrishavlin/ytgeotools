@@ -17,7 +17,7 @@ ds_yt = ds.interpolate_to_uniform_cartesian(
     max_dist=50,
     return_yt=True,
     rescale_coords=True,
-    apply_functions=[refill, np.abs],
+    apply_functions={"dvs": [refill, np.abs]},
 )
 
 rc = yt_idv.render_context(height=800, width=800, gui=True)

@@ -24,7 +24,7 @@ ds_yt = ds.interpolate_to_uniform_cartesian(
     N=100,
     return_yt=True,
     rescale_coords=True,
-    apply_functions=[refill, np.abs],
+    apply_functions={"dvs": [refill, np.abs]},
 )
 
 ds_yt_2 = ds.interpolate_to_uniform_cartesian(
@@ -32,7 +32,7 @@ ds_yt_2 = ds.interpolate_to_uniform_cartesian(
     N=100,
     return_yt=True,
     rescale_coords=True,
-    apply_functions=[refill2, np.abs],
+    apply_functions={"dvs": [refill2, np.abs]},
 )
 
 

@@ -10,11 +10,11 @@ from ytgeotools.coordinate_transformations import geosphere2cart
 from ytgeotools.data_manager import data_manager as _dm
 from ytgeotools.ytgeotools import Dataset
 from ytgeotools.mapping import default_crs, validate_lons, successive_joins
-from ytgeotools.geo_points.datasets import _GeoPoint
 from ytgeotools.seismology.collections import ProfileCollection
 import geopandas as gpd
 import pandas as pd
 from ytgeotools.dependencies import dependency_checker
+
 
 class GeoSpherical(Dataset):
     def __init__(
@@ -125,26 +125,38 @@ class GeoSpherical(Dataset):
 
     def interpolate_to_uniform_cartesian(
         self,
-        fields: list,
+        fields: List[str],
         N: int = 50,
         max_dist: Union[int, float] = 100,
         interpChunk: int = 500000,
         recylce_trees: bool = False,
         return_yt: bool = False,
         rescale_coords: bool = False,
-        apply_functions: list = None,
+        apply_functions: dict = None,
     ):
         """
         moves geo-spherical data (radius/depth, lat, lon) to earth-centered
         cartesian coordinates using a kdtree with inverse distance weighting (IDW)
 
-
+        fields: List[str]
+            fields to interpolate
+        N: int
+            number of points in shortest dimension (default 50)
         max_dist : int or float
             the max distance away for nearest neighbor search (default 100)
         interpChunk : int
             the chunk size for querying the kdtree (default 500000)
-        recylce_trees : boolean
-            if True, will store the kdtree(s) generated (default False)
+        recylce_trees : bool
+            if True, will store the generated kdtree(s) in memory (default False)
+        return_yt: bool
+            if True, will return a yt dataset (default False)
+        rescale_coords: bool
+            if True, will rescale the dimensions to 1. in smallest range,
+            maintaining aspect ration in other dimensions (default False)
+        apply_functions: dict
+            a dictionary with fields as keys, pointing to a list of callable
+            functions that get applied to the the interpolated field. Functions
+            must accept and return an ndarray.
         """
 
         x, y, z = self.cartesian_coords  # the actual xyz at which we have data
@@ -192,7 +204,7 @@ class GeoSpherical(Dataset):
         if parallel_query:
             raise NotImplementedError
         else:
-            interpd = query_trees(
+            interpd = _query_trees(
                 xdata,
                 ydata,
                 zdata,
@@ -212,9 +224,9 @@ class GeoSpherical(Dataset):
             for dim in range(3):
                 xyz[dim] = (xyz[dim] - cart_bbox[dim, 0]) / max_wid
 
-        for funchandle in apply_functions:
-            for key, vals in interpd.items():
-                interpd[key] = funchandle(vals)
+        for key, funchandles in apply_functions.items():
+            for funchandle in funchandles:
+                interpd[key] = funchandle(interpd[key])
 
         if return_yt:
             coords = {
@@ -311,21 +323,26 @@ class GeoSpherical(Dataset):
         return super().load_uniform_grid()
 
 
-def query_trees(
-    xdata, ydata, zdata, interpChunk, fields, trees, interpd, orig_shape, max_dist
-):
-
+def _query_trees(xdata: np.ndarray,
+                 ydata: np.ndarray,
+                 zdata: np.ndarray,
+                 interpChunk: int,
+                 fields: List[str],
+                 trees: dict,
+                 interpd: dict,
+                 orig_shape: tuple,
+                 max_dist: float,
+                 ) -> dict:
     # query the tree at each new grid point and weight nearest neighbors
     # by inverse distance. proceed in chunks.
     N_grid = len(xdata)
     print("querying kdtree on interpolated grid")
-    chunk = interpChunk
-    N_chunks = int(N_grid / chunk) + 1
-    print("breaking into " + str(N_chunks) + " chunks")
+    N_chunks = int(N_grid / interpChunk) + 1
+    print(f"breaking into {N_chunks} chunks")
     for i_chunk in range(0, N_chunks):
-        print("   processing chunk " + str(i_chunk + 1) + " of " + str(N_chunks))
-        i_0 = i_chunk * chunk
-        i_1 = i_0 + chunk
+        print(f"   processing chunk {i_chunk + 1} of {N_chunks}")
+        i_0 = i_chunk * interpChunk
+        i_1 = i_0 + interpChunk
         if i_1 > N_grid:
             i_1 = N_grid
         pts = np.column_stack((xdata[i_0:i_1], ydata[i_0:i_1], zdata[i_0:i_1]))
@@ -468,10 +485,8 @@ class ReferenceModel1D(ReferenceModel):
     def interpolate_func(self):
         if self._interpolate_func is None:
 
-            # ensure depth is increasing
-            # sorted_i = np.argsort(self.depth)
-            depth = self.depth#[sorted_i]
-            vals = self.vals#[sorted_i]
+            depth = self.depth
+            vals = self.vals
 
             if self.disc_correction:
                 # deal with discontinuities
