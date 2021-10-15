@@ -14,7 +14,7 @@ from ytgeotools.geo_points.datasets import _GeoPoint
 from ytgeotools.seismology.collections import ProfileCollection
 import geopandas as gpd
 from pandas import isnull as pd_isnull
-
+from ytgeotools.dependencies import dependency_checker
 
 class GeoSpherical(Dataset):
     def __init__(
@@ -305,6 +305,10 @@ class GeoSpherical(Dataset):
             crds[:, 0],
             crs=self.crs,
         )
+
+    @dependency_checker.requires_cartopy
+    def load_uniform_grid(self):
+        return super().load_uniform_grid()
 
 
 def query_trees(
