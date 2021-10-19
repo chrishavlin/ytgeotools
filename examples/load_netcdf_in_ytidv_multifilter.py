@@ -1,8 +1,9 @@
 import numpy as np
 import yt_idv
-from ytgeotools.seismology.datasets import XarrayGeoSpherical
 from yt_idv.scene_components.blocks import BlockRendering
 from yt_idv.scene_data.block_collection import BlockCollection
+
+from ytgeotools.seismology.datasets import XarrayGeoSpherical
 
 
 def refill(vals):

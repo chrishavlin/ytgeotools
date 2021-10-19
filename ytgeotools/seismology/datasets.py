@@ -25,11 +25,14 @@ class GeoSpherical(Dataset):
         latitude: ArrayLike,
         longitude: ArrayLike,
         depth: ArrayLike,
-        coord_order: list = ["latitude", "longitude", "depth"],
+        coord_order: list = None,
         use_neg_lons: bool = False,
         max_radius: float = 6371.0,
         crs: dict = default_crs,
     ):
+
+        if coord_order is None:
+            coord_order = ["latitude", "longitude", "depth"]
 
         self.max_radius = max_radius
 
