@@ -1,5 +1,6 @@
 import numpy as np
 import yt_idv
+
 from ytgeotools.seismology.datasets import XarrayGeoSpherical
 
 

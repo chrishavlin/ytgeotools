@@ -1,7 +1,8 @@
-from ytgeotools.geo_points import EarthChem
-from ytgeotools.seismology.datasets import XarrayGeoSpherical
 import matplotlib.pyplot as plt
 import numpy as np
+
+from ytgeotools.geo_points import EarthChem
+from ytgeotools.seismology.datasets import XarrayGeoSpherical
 
 file = "data/geo_points/earthchem_download_90561.csv"
 
@@ -9,7 +10,11 @@ file = "data/geo_points/earthchem_download_90561.csv"
 initial_filters = [
     {"column": "age", "comparison": "<=", "value": 30},
 ]
-echem = EarthChem(file, initial_filters=initial_filters)
+echem = EarthChem(
+    file,
+    initial_filters=initial_filters,
+    drop_duplicates_by=["latitude", "longitude", "age"],
+)
 
 _, volcanic_bound_df, _ = echem.build_volcanic_extent(radius_deg=0.5)
 

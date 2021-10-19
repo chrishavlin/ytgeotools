@@ -1,14 +1,11 @@
 """
 class for processing point data
 """
-import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from shapely.geometry import LineString, MultiPoint, Point, Polygon
+from shapely.geometry import MultiPoint
 from sklearn.cluster import KMeans
-
-from . import mapping as MS
 
 
 class pointData(object):
@@ -36,8 +33,11 @@ class pointData(object):
         setattr(self, self.xname + "_c", x_c)
         setattr(self, self.yname + "_c", y_c)
 
-    def assignDfToGrid(self, binfields=[]):
+    def assignDfToGrid(self, binfields=None):
         """finds stats within bins. binfield is the field to bin"""
+
+        if binfields is None:
+            binfields = []
 
         if hasattr(self, self.xname):
             xedges = getattr(self, self.xname)
@@ -147,15 +147,13 @@ def KmeansSensitivity(max_N, X1, X2, min_N=1):
         clustering = KMeans(n_clusters=nclust).fit(Xcluster)
         inert.append(clustering.inertia_)
         results["bounds"][nclust] = {}
-        try:
-            # find bounding polygon of each cluster
-            for lev in np.unique(clustering.labels_):
-                x_1 = X1[clustering.labels_ == lev]
-                x_2 = X2[clustering.labels_ == lev]
-                b = MultiPoint(np.column_stack((x_1, x_2))).convex_hull
-                results["bounds"][nclust][lev] = b
-        except:
-            pass
+
+        # find bounding polygon of each cluster
+        for lev in np.unique(clustering.labels_):
+            x_1 = X1[clustering.labels_ == lev]
+            x_2 = X2[clustering.labels_ == lev]
+            b = MultiPoint(np.column_stack((x_1, x_2))).convex_hull
+            results["bounds"][nclust][lev] = b
 
     results["inertia"] = np.array(inert)
     results["clusters"] = np.array(Nclusters)

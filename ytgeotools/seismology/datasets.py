@@ -1,24 +1,26 @@
-from typing import Type, Union, Any, List
-from scipy.interpolate import interp1d
+from abc import ABC, abstractmethod
+from typing import Any, List, Type, Union
+
+import geopandas as gpd
 import numpy as np
+import pandas as pd
 import xarray as xr
 from numpy.typing import ArrayLike
 from scipy import spatial
+from scipy.interpolate import interp1d
 from unyt import unyt_quantity
-from abc import ABC, abstractmethod
+
 from ytgeotools.coordinate_transformations import geosphere2cart
 from ytgeotools.data_manager import data_manager as _dm
-from ytgeotools.ytgeotools import Dataset
-from ytgeotools.mapping import default_crs, validate_lons, successive_joins
-from ytgeotools.seismology.collections import ProfileCollection
-import geopandas as gpd
-import pandas as pd
 from ytgeotools.dependencies import dependency_checker
+from ytgeotools.mapping import default_crs, successive_joins, validate_lons
+from ytgeotools.seismology.collections import ProfileCollection
+from ytgeotools.ytgeotools import Dataset
 
 
-def _calculate_perturbation(ref_data: np.ndarray,
-                            field_data: np.ndarray,
-                            perturbation_type: str) -> np.ndarray:
+def _calculate_perturbation(
+    ref_data: np.ndarray, field_data: np.ndarray, perturbation_type: str
+) -> np.ndarray:
     return_data = ref_data - field_data
     if perturbation_type in ["percent", "fractional"]:
         return_data = return_data / ref_data
@@ -27,9 +29,9 @@ def _calculate_perturbation(ref_data: np.ndarray,
     return return_data
 
 
-def _calculate_absolute(ref_data: np.ndarray,
-                        field_data: np.ndarray,
-                        perturbation_type: str) -> np.ndarray:
+def _calculate_absolute(
+    ref_data: np.ndarray, field_data: np.ndarray, perturbation_type: str
+) -> np.ndarray:
     # field_data is a perturbation, ref frame value
     if perturbation_type == "absolute":
         return_data = ref_data - field_data
@@ -41,7 +43,6 @@ def _calculate_absolute(ref_data: np.ndarray,
 
 
 class ReferenceModel(ABC):
-
     @abstractmethod
     def interpolate_func(self):
         pass
@@ -74,11 +75,14 @@ class ReferenceModel1D(ReferenceModel):
         creating the interpolating function. This looks for points at the same
         depth and offsets them by a small value.
     """
-    def __init__(self,
-                 fieldname: str,
-                 depth: np.typing.ArrayLike,
-                 vals: np.typing.ArrayLike,
-                 disc_correction: bool = True):
+
+    def __init__(
+        self,
+        fieldname: str,
+        depth: np.typing.ArrayLike,
+        vals: np.typing.ArrayLike,
+        disc_correction: bool = True,
+    ):
         self.fieldname = fieldname
         self.depth = self._validate_array(depth)
         self.depth_range = (np.min(self.depth), np.max(self.depth))
@@ -102,15 +106,13 @@ class ReferenceModel1D(ReferenceModel):
                 eps_off = self.disc_off_eps
                 d_diffs = depth[1:] - depth[0:-1]  # will be 1 element smaller
                 disc_i = np.where(d_diffs == 0)[0]  # indices of discontinuties
-                depth[disc_i+1] = depth[disc_i+1] + eps_off
+                depth[disc_i + 1] = depth[disc_i + 1] + eps_off
 
             # build and return the interpolation function
             self._interpolate_func = interp1d(depth, vals)
         return self._interpolate_func
 
-    def evaluate(self,
-                 depths: np.typing.ArrayLike,
-                 method: str = "interp") -> Any:
+    def evaluate(self, depths: np.typing.ArrayLike, method: str = "interp") -> Any:
         if method == "interp":
             return self.interpolate_func(depths)
         elif method == "nearest":
@@ -118,13 +120,11 @@ class ReferenceModel1D(ReferenceModel):
 
 
 class ReferenceCollection:
-
     def __init__(self, ref_models: List[ReferenceModel1D]):
         self.reference_fields = []
         for ref_mod in ref_models:
             setattr(self, ref_mod.fieldname, ref_mod)
             self.reference_fields.append(ref_mod.fieldname)
-
 
 
 class GeoSpherical(Dataset):
@@ -134,11 +134,14 @@ class GeoSpherical(Dataset):
         latitude: ArrayLike,
         longitude: ArrayLike,
         depth: ArrayLike,
-        coord_order: list = ["latitude", "longitude", "depth"],
+        coord_order: list = None,
         use_neg_lons: bool = False,
         max_radius: float = 6371.0,
         crs: dict = default_crs,
     ):
+
+        if coord_order is None:
+            coord_order = ["latitude", "longitude", "depth"]
 
         self.max_radius = max_radius
 
@@ -168,7 +171,10 @@ class GeoSpherical(Dataset):
 
     @property
     def cartesian_coords(self) -> tuple:
-        "returns 3d arrays representing earth-centered cartesian coordinates of every grid point"
+        """
+        returns 3d arrays representing earth-centered cartesian coordinates of
+        every grid point
+        """
 
         if self._cartesian_coords is None:
             depth, lat, lon = self._get_lat_lon_depth_grid()
@@ -182,7 +188,8 @@ class GeoSpherical(Dataset):
     def cartesian_bbox(self):
         if self._cartesian_bbox is None:
             x, y, z = self.cartesian_coords
-            self._cartesian_bbox = np.array([[d.min(), d.max()] for d in [x, y, z]])
+            cbbox = np.array([[d.min(), d.max()] for d in [x, y, z]])
+            self._cartesian_bbox = cbbox
         return self._cartesian_bbox
 
     def convert_to_cartesian(self, latitude, longitude, depth, rescale):
@@ -412,7 +419,7 @@ class GeoSpherical(Dataset):
         lat = self.get_coord("latitude")
 
         var = getattr(self, field)
-        for rowid, row in surface_df.iterrows():
+        for _, row in surface_df.iterrows():
             lon_id = np.where(lon == row["longitude"])[0][0]
             lat_id = np.where(lat == row["latitude"])[0][0]
             if depth_mask is None:
@@ -437,13 +444,14 @@ class GeoSpherical(Dataset):
     def load_uniform_grid(self):
         return super().load_uniform_grid()
 
-    def _perturbation_calcs(self,
-                            ref_model: Union[Type[ReferenceModel1D], Type[ReferenceCollection]],
-                            field: str,
-                            ref_model_field: str = None,
-                            perturbation_type: str = "percent",
-                            to_perturbation: bool = True
-                            ):
+    def _perturbation_calcs(
+        self,
+        ref_model: Union[Type[ReferenceModel1D], Type[ReferenceCollection]],
+        field: str,
+        ref_model_field: str = None,
+        perturbation_type: str = "percent",
+        to_perturbation: bool = True,
+    ):
 
         field_data = getattr(self, field)
         depth, lat, lon = self._get_lat_lon_depth_grid()
@@ -457,48 +465,59 @@ class GeoSpherical(Dataset):
 
         if to_perturbation:
             # field is in reference, calculate the perturbation
-            return_data = _calculate_perturbation(ref_data, field_data, perturbation_type)
+            return_data = _calculate_perturbation(
+                ref_data, field_data, perturbation_type
+            )
         else:
             # calculate absolute from perturbation
             return_data = _calculate_absolute(ref_data, field_data, perturbation_type)
 
         return return_data
 
-    def get_perturbation(self,
-                         ref_model: Union[Type[ReferenceModel1D], Type[ReferenceCollection]],
-                         field: str,
-                         ref_model_field: str = None,
-                         perturbation_type: str = "percent"):
+    def get_perturbation(
+        self,
+        ref_model: Union[Type[ReferenceModel1D], Type[ReferenceCollection]],
+        field: str,
+        ref_model_field: str = None,
+        perturbation_type: str = "percent",
+    ):
 
-        return self._perturbation_calcs(ref_model,
-                                        field,
-                                        ref_model_field=ref_model_field,
-                                        perturbation_type=perturbation_type,
-                                        to_perturbation=True)
+        return self._perturbation_calcs(
+            ref_model,
+            field,
+            ref_model_field=ref_model_field,
+            perturbation_type=perturbation_type,
+            to_perturbation=True,
+        )
 
-    def get_absolute(self,
-                     ref_model: Union[Type[ReferenceModel1D], Type[ReferenceCollection]],
-                     field: str,
-                     ref_model_field: str = None,
-                     perturbation_type: str = "percent"):
+    def get_absolute(
+        self,
+        ref_model: Union[Type[ReferenceModel1D], Type[ReferenceCollection]],
+        field: str,
+        ref_model_field: str = None,
+        perturbation_type: str = "percent",
+    ):
 
-        return self._perturbation_calcs(ref_model,
-                                        field,
-                                        ref_model_field=ref_model_field,
-                                        perturbation_type=perturbation_type,
-                                        to_perturbation=False)
+        return self._perturbation_calcs(
+            ref_model,
+            field,
+            ref_model_field=ref_model_field,
+            perturbation_type=perturbation_type,
+            to_perturbation=False,
+        )
 
 
-def _query_trees(xdata: np.ndarray,
-                 ydata: np.ndarray,
-                 zdata: np.ndarray,
-                 interpChunk: int,
-                 fields: List[str],
-                 trees: dict,
-                 interpd: dict,
-                 orig_shape: tuple,
-                 max_dist: float,
-                 ) -> dict:
+def _query_trees(
+    xdata: np.ndarray,
+    ydata: np.ndarray,
+    zdata: np.ndarray,
+    interpChunk: int,
+    fields: List[str],
+    trees: dict,
+    interpd: dict,
+    orig_shape: tuple,
+    max_dist: float,
+) -> dict:
     # query the tree at each new grid point and weight nearest neighbors
     # by inverse distance. proceed in chunks.
     N_grid = len(xdata)
@@ -549,9 +568,12 @@ class XarrayGeoSpherical(GeoSpherical):
         filename: str,
         field_subset: Union[list] = None,
         coord_aliases: dict = None,
-        max_radius: Type[unyt_quantity] = unyt_quantity(6371.0, "km"),
+        max_radius: Union[float, int] = 6371.0,
+        radius_units: str = "km",
         use_neg_lons: bool = False,
     ):
+
+        max_radius = unyt_quantity(max_radius, radius_units)
 
         filename = _dm.validate_file(filename)
         with xr.open_dataset(filename) as ds:
@@ -568,9 +590,9 @@ class XarrayGeoSpherical(GeoSpherical):
             for f in field_subset:
                 if "_".join(list(getattr(ds, f).coords)) != co_hash:
                     raise ValueError(
-                        f"all fields must have the same coordinate ordering but {f} does not."
-                        " Please provide a field_subset containing only fields that have "
-                        "the same coordinate ordering."
+                        f"all fields must have the same coordinate ordering but "
+                        f"{f} does not. Please provide a field_subset containing "
+                        f"only fields that have the same coordinate ordering."
                     )
 
             # pull out our data values
@@ -599,10 +621,94 @@ class XarrayGeoSpherical(GeoSpherical):
         )
 
 
-def load_1d_csv_ref(filename: str,
-                    depth_column: str,
-                    value_column: str,
-                    **kwargs: Any) -> Type[ReferenceModel1D]:
+class ReferenceModel(ABC):
+    @abstractmethod
+    def interpolate_func(self):
+        pass
+
+    @abstractmethod
+    def evaluate(self):
+        # return model values at a point
+        pass
+
+    def _validate_array(self, vals: np.typing.ArrayLike) -> np.ndarray:
+        if type(vals) == np.ndarray:
+            return vals
+        return np.asarray(vals)
+
+
+class ReferenceModel1D(ReferenceModel):
+    """
+    A one-dimensional reference model
+
+    Parameters
+    ----------
+    fieldname : str
+        the name of the reference fild
+    depth : ArrayLike
+        array-like depth values for the reference model
+    vals : Arraylike
+        array-like model values
+    disc_correction : bool
+        if True (the default), will apply a discontinuity correction before
+        creating the interpolating function. This looks for points at the same
+        depth and offsets them by a small value.
+    """
+
+    def __init__(
+        self,
+        fieldname: str,
+        depth: np.typing.ArrayLike,
+        vals: np.typing.ArrayLike,
+        disc_correction: bool = True,
+    ):
+        self.fieldname = fieldname
+        self.depth = self._validate_array(depth)
+        self.depth_range = (np.min(self.depth), np.max(self.depth))
+        self.vals = self._validate_array(vals)
+        self.disc_correction = disc_correction
+        self.disc_off_eps = np.finfo(float).eps
+
+    _interpolate_func = None
+
+    @property
+    def interpolate_func(self):
+        if self._interpolate_func is None:
+
+            depth = self.depth
+            vals = self.vals
+
+            if self.disc_correction:
+                # deal with discontinuities
+                # offset disc depths by a small number
+                # disc_vals=[]
+                eps_off = self.disc_off_eps
+                d_diffs = depth[1:] - depth[0:-1]  # will be 1 element smaller
+                disc_i = np.where(d_diffs == 0)[0]  # indices of discontinuties
+                depth[disc_i + 1] = depth[disc_i + 1] + eps_off
+
+            # build and return the interpolation function
+            self._interpolate_func = interp1d(depth, vals)
+        return self._interpolate_func
+
+    def evaluate(self, depths: np.typing.ArrayLike, method: str = "interp") -> Any:
+        if method == "interp":
+            return self.interpolate_func(depths)
+        elif method == "nearest":
+            raise NotImplementedError
+
+
+class ReferenceCollection:
+    def __init__(self, ref_models: List[ReferenceModel1D]):
+        self.reference_fields = []
+        for ref_mod in ref_models:
+            setattr(self, ref_mod.fieldname, ref_mod)
+            self.reference_fields.append(ref_mod.fieldname)
+
+
+def load_1d_csv_ref(
+    filename: str, depth_column: str, value_column: str, **kwargs: Any
+) -> Type[ReferenceModel1D]:
     """
 
     loads a 1D reference model from a CSV file
@@ -638,10 +744,9 @@ def load_1d_csv_ref(filename: str,
     return ReferenceModel1D(value_column, d, v, disc_correction=True)
 
 
-def load_1d_csv_ref_collection(filename: str,
-                               depth_column: str,
-                               value_columns: List[str] = None,
-                               **kwargs: Any) -> Type[ReferenceCollection]:
+def load_1d_csv_ref_collection(
+    filename: str, depth_column: str, value_columns: List[str] = None, **kwargs: Any
+) -> Type[ReferenceCollection]:
     """
 
     loads a 1D reference model collection from a CSV file

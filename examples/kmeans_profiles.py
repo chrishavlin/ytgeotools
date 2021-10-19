@@ -1,6 +1,7 @@
-from ytgeotools.seismology.datasets import XarrayGeoSpherical
-from ytgeotools.seismology.collections import DepthSeriesKMeans
 import matplotlib.pyplot as plt
+
+from ytgeotools.seismology.collections import DepthSeriesKMeans
+from ytgeotools.seismology.datasets import XarrayGeoSpherical
 
 vs_file = "IRIS/wUS-SH-2010_percent.nc"
 ds = XarrayGeoSpherical(vs_file)
