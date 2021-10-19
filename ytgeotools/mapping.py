@@ -109,9 +109,10 @@ class PolygonFile(OnDiskGeometry):
         return gpd_df
 
 
-def build_bounding_df(
-    latitudes, longitudes, crs={"init": "epsg:4326"}, description="bounding_poly"
-):
+def build_bounding_df(latitudes, longitudes, crs=None, description="bounding_poly"):
+
+    if crs is None:
+        crs = {"init": "epsg:4326"}
 
     poly = Polygon([[p[0], p[1]] for p in zip(longitudes, latitudes)])
 
@@ -197,7 +198,7 @@ class BoundingPolies(object):
         polies = []
         lons = self.lonname
         lats = self.latname
-        for rowid, row in df.iterrows():
+        for _, row in df.iterrows():
             polies.append(
                 Polygon(circ(row[lats], row[lons], radius_deg, radius_deg / 10))
             )

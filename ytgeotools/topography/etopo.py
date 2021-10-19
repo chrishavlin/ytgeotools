@@ -6,7 +6,8 @@ from ytgeotools.mapping import validate_lons
 
 class Etopo(object):
     """
-    class for loading dem topo files from https://www.ngdc.noaa.gov/mgg/global/global.html
+    class for loading dem topo files from
+    https://www.ngdc.noaa.gov/mgg/global/global.html
     """
 
     def __init__(self, filename, loadFile=True, use_negative_lons=False):
@@ -37,7 +38,7 @@ class Etopo(object):
         headervals = []
         header = ["ncols", "nrows", "lon1", "lat1", "d_deg"]
         with open(self.filename, "r") as f:
-            for i in range(5):
+            for _ in range(5):
                 line = next(f)  # .next()
                 headervals.append(float(line.split(" ")[-1]))
         header_dict = dict(zip(header, headervals))
@@ -57,5 +58,3 @@ class Etopo(object):
         )
         self.longitude = validate_lons(raw_lons, self.use_negative_lons)
         self.topo_range = header_dict
-
-    _topo_df

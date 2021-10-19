@@ -303,7 +303,7 @@ class GeoSpherical(Dataset):
         lat = self.get_coord("latitude")
 
         var = getattr(self, field)
-        for rowid, row in surface_df.iterrows():
+        for _, row in surface_df.iterrows():
             lon_id = np.where(lon == row["longitude"])[0][0]
             lat_id = np.where(lat == row["latitude"])[0][0]
             if depth_mask is None:
@@ -390,9 +390,12 @@ class XarrayGeoSpherical(GeoSpherical):
         filename: str,
         field_subset: Union[list] = None,
         coord_aliases: dict = None,
-        max_radius: Type[unyt_quantity] = unyt_quantity(6371.0, "km"),
+        max_radius: Union[float, int] = 6371.0,
+        radius_units: str = "km",
         use_neg_lons: bool = False,
     ):
+
+        max_radius = unyt_quantity(max_radius, radius_units)
 
         filename = _dm.validate_file(filename)
         with xr.open_dataset(filename) as ds:

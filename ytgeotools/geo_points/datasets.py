@@ -125,15 +125,39 @@ class CSVData(_GeoPoint):
 
 
 class EarthChem(CSVData):
+    """
+    An EarthChem database CSV export
+
+    Parameters
+    ----------
+    Same as CSVData except:
+
+    drop_duplicates_by : list
+            list of columns to drop duplicates by, default
+        filename
+    use_neg_lons: bool
+        allow negative longitudes, will convert if False (the default)
+    initial_filters: list
+
+    drop_duplicates_by: list = None,
+    lonname: str = "lon",
+    latname: str = "lat",
+
+    """
+
     def __init__(
         self,
         filename: str,
         use_neg_lons: bool = False,
         initial_filters: list = None,
-        drop_duplicates_by: list = ["latitude", "longitude", "age"],
+        drop_duplicates_by: list = None,
         lonname: str = "lon",
         latname: str = "lat",
     ):
+
+        if drop_duplicates_by is None:
+            drop_duplicates_by = ["latitude", "longitude", "age"]
+
         super().__init__(
             filename,
             use_neg_lons=use_neg_lons,
