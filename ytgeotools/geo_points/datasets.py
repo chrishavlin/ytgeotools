@@ -1,11 +1,11 @@
+from abc import ABC, abstractmethod
+
 import geopandas as gpd
 import pandas as pd
 from geopandas import GeoDataFrame
-from abc import ABC, abstractmethod
 
 from ytgeotools.data_manager import data_manager as _dm
 from ytgeotools.mapping import BoundingPolies, default_crs, validate_lons
-from typing import Tuple
 
 
 def _apply_filter(df, filter: dict):
@@ -58,8 +58,8 @@ class CSVData(_GeoPoint):
             None. Should have the form:
 
             [
-                {"column": "age", "value":100, "comparison": "<="},
-                {"column": "rock_name", "value":"RHYOLITE", "comparison": "=="},
+              {"column": "age", "value":100, "comparison": "<="},
+              {"column": "rock_name", "value":"RHYOLITE", "comparison": "=="},
             ]
 
             Filters will be applied in the order supplied.
@@ -163,9 +163,7 @@ class EarthChem(CSVData):
 
         """
 
-        boundingPoly = BoundingPolies(self.df,
-                                      b_df=boundary_df,
-                                      radius_deg=radius_deg)
+        boundingPoly = BoundingPolies(self.df, b_df=boundary_df, radius_deg=radius_deg)
         vbf = boundingPoly.df_bound
         vbf = GeoDataFrame(geometry=vbf.geometry, crs=self.crs)
 

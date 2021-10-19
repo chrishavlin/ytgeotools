@@ -3,10 +3,11 @@ import os
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+from pandas import isnull as pd_isnull
 from shapely import affinity as aff
 from shapely.geometry import Point, Polygon
 from shapely.ops import cascaded_union
-from pandas import isnull as pd_isnull
+
 from ytgeotools.data_manager import data_manager
 
 default_crs = {"init": "epsg:4326"}
