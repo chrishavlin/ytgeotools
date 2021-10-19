@@ -641,7 +641,7 @@ def load_1d_csv_ref(
 
     Returns
     -------
-    ReferenceCollection
+    ReferenceModel1D
 
     Examples
     --------
