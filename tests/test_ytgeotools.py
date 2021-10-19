@@ -2,11 +2,11 @@
 
 """Tests for `ytgeotools` package."""
 
-import pytest
-
 import numpy as np
-from ytgeotools import ytgeotools
 import yt
+
+from ytgeotools import ytgeotools
+
 
 def get_dataset(shp=(2, 3, 4), fields=("density",), cnms=("x", "y", "z")):
     shp = (2, 3, 4)
@@ -14,7 +14,7 @@ def get_dataset(shp=(2, 3, 4), fields=("density",), cnms=("x", "y", "z")):
     data = {f: np.random.random(shp) for f in fields}
     coords = {}
     for cid, c in enumerate(cnms):
-        coords[cid] = {"values":  np.linspace(0, 1, shp[cid]), "name": c}
+        coords[cid] = {"values": np.linspace(0, 1, shp[cid]), "name": c}
 
     return ytgeotools.Dataset(data, coords)
 
@@ -38,7 +38,7 @@ def test_dataset():
 
     assert ds._coord_order == [c for c in cnms]
     for cid, c in enumerate(cnms):
-        ds.get_coord(c).shape == (fshp[cid], )
+        ds.get_coord(c).shape == (fshp[cid],)
 
 
 def test_to_yt():
@@ -52,4 +52,3 @@ def test_to_yt():
     for f in test_fields:
         assert ("stream", f) in yt_ds.field_list
         assert type(yt_ds) == yt.frontends.stream.StreamDataset
-

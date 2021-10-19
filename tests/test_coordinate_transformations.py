@@ -2,19 +2,19 @@
 
 """Tests for `ytgeotools` package."""
 
-import pytest
-
 import numpy as np
+
 import ytgeotools.coordinate_transformations as yct
 
 
 def yield_coords():
     coords = [
-        (0.5, np.pi/2, 6371.),
-        (np.linspace(1e-6, np.pi-1e-6, 3),
-         np.linspace(1e-6, 2*np.pi-1e-6, 3),
-         np.linspace(500, 6371, 3))
-
+        (0.5, np.pi / 2, 6371.0),
+        (
+            np.linspace(1e-6, np.pi - 1e-6, 3),
+            np.linspace(1e-6, 2 * np.pi - 1e-6, 3),
+            np.linspace(500, 6371, 3),
+        ),
     ]
     phi, theta, r = coords[1]
     coords.append(np.meshgrid(phi, theta, r))
@@ -26,16 +26,16 @@ def yield_coords():
 
 def test_quadrant_id():
 
-    assert yct.get_xy_quad(0., 0.) == np.array(1)
-    assert yct.get_xy_quad(1., 0.) == np.array(1)
-    assert yct.get_xy_quad(1., .25) == np.array(1)
-    assert yct.get_xy_quad(1., 1.) == np.array(1)
-    assert yct.get_xy_quad(0., 1.) == np.array(1)
-    assert yct.get_xy_quad(-1., 0.) == np.array(2)
-    assert yct.get_xy_quad(-1., 1.) == np.array(2)
-    assert yct.get_xy_quad(-1., -1.) == np.array(3)
-    assert yct.get_xy_quad(1., -1.) == np.array(4)
-    assert yct.get_xy_quad(0., -1.) == np.array(4)
+    assert yct.get_xy_quad(0.0, 0.0) == np.array(1)
+    assert yct.get_xy_quad(1.0, 0.0) == np.array(1)
+    assert yct.get_xy_quad(1.0, 0.25) == np.array(1)
+    assert yct.get_xy_quad(1.0, 1.0) == np.array(1)
+    assert yct.get_xy_quad(0.0, 1.0) == np.array(1)
+    assert yct.get_xy_quad(-1.0, 0.0) == np.array(2)
+    assert yct.get_xy_quad(-1.0, 1.0) == np.array(2)
+    assert yct.get_xy_quad(-1.0, -1.0) == np.array(3)
+    assert yct.get_xy_quad(1.0, -1.0) == np.array(4)
+    assert yct.get_xy_quad(0.0, -1.0) == np.array(4)
 
 
 def test_coord_roundtrip():
@@ -51,7 +51,7 @@ def test_coord_roundtrip():
 def test_geo_coords():
 
     for phi, theta, radius in yield_coords():
-        lat = 90. - phi * 180. / np.pi
+        lat = 90.0 - phi * 180.0 / np.pi
         lon = theta * 180 / np.pi
 
         x_g, y_g, z_g = yct.geosphere2cart(lat, lon, radius)
