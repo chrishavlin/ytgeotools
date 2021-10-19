@@ -1,1 +1,1 @@
-from .datasets import EarthChem
+from .datasets import EarthChem  # noqa: F401

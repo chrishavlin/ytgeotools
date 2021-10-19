@@ -1,11 +1,11 @@
+from abc import ABC, abstractmethod
+
 import geopandas as gpd
 import pandas as pd
 from geopandas import GeoDataFrame
-from abc import ABC, abstractmethod
 
 from ytgeotools.data_manager import data_manager as _dm
 from ytgeotools.mapping import BoundingPolies, default_crs, validate_lons
-from typing import Tuple
 
 
 def _apply_filter(df, filter: dict):
@@ -58,8 +58,8 @@ class CSVData(_GeoPoint):
             None. Should have the form:
 
             [
-                {"column": "age", "value":100, "comparison": "<="},
-                {"column": "rock_name", "value":"RHYOLITE", "comparison": "=="},
+              {"column": "age", "value":100, "comparison": "<="},
+              {"column": "rock_name", "value":"RHYOLITE", "comparison": "=="},
             ]
 
             Filters will be applied in the order supplied.
@@ -125,15 +125,39 @@ class CSVData(_GeoPoint):
 
 
 class EarthChem(CSVData):
+    """
+    An EarthChem database CSV export
+
+    Parameters
+    ----------
+    Same as CSVData except:
+
+    drop_duplicates_by : list
+            list of columns to drop duplicates by, default
+        filename
+    use_neg_lons: bool
+        allow negative longitudes, will convert if False (the default)
+    initial_filters: list
+
+    drop_duplicates_by: list = None,
+    lonname: str = "lon",
+    latname: str = "lat",
+
+    """
+
     def __init__(
         self,
         filename: str,
         use_neg_lons: bool = False,
         initial_filters: list = None,
-        drop_duplicates_by: list = ["latitude", "longitude", "age"],
+        drop_duplicates_by: list = None,
         lonname: str = "lon",
         latname: str = "lat",
     ):
+
+        if drop_duplicates_by is None:
+            drop_duplicates_by = ["latitude", "longitude", "age"]
+
         super().__init__(
             filename,
             use_neg_lons=use_neg_lons,
@@ -163,9 +187,7 @@ class EarthChem(CSVData):
 
         """
 
-        boundingPoly = BoundingPolies(self.df,
-                                      b_df=boundary_df,
-                                      radius_deg=radius_deg)
+        boundingPoly = BoundingPolies(self.df, b_df=boundary_df, radius_deg=radius_deg)
         vbf = boundingPoly.df_bound
         vbf = GeoDataFrame(geometry=vbf.geometry, crs=self.crs)
 

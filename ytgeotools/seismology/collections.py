@@ -1,11 +1,11 @@
-from tslearn.clustering import TimeSeriesKMeans
-from dask import delayed, compute
-from ytgeotools.mapping import default_crs
-from geopandas import GeoDataFrame, points_from_xy, sjoin, GeoSeries
-import numpy as np
-from ytgeotools.mapping import BoundingPolies
-from shapely.ops import cascaded_union
 from typing import Type
+
+import numpy as np
+from dask import compute, delayed
+from geopandas import GeoDataFrame, points_from_xy, sjoin
+from tslearn.clustering import TimeSeriesKMeans
+
+from ytgeotools.mapping import BoundingPolies, default_crs
 
 
 class ProfileCollection:
@@ -21,17 +21,17 @@ class ProfileCollection:
     @property
     def surface_df(self):
         if self._surface_df is None:
-            df = GeoDataFrame({"longitude": self.x,
-                               "latitude": self.y},
-                              geometry=points_from_xy(self.x, self.y),
-                              crs=self.crs)
+            df = GeoDataFrame(
+                {"longitude": self.x, "latitude": self.y},
+                geometry=points_from_xy(self.x, self.y),
+                crs=self.crs,
+            )
             self._surface_df = df
         return self._surface_df
 
     def get_surface_union(self, *args, **kwargs):
         bp = BoundingPolies(self.surface_df, *args, **kwargs)
         return GeoDataFrame(geometry=bp.df_bound.geometry, crs=self.crs)
-
 
 
 def fit_kmeans(profile_collection, n_clusters=3, **kwargs):
@@ -134,11 +134,9 @@ class DepthSeriesKMeans(TimeSeriesKMeans):
     def get_classified_coordinates(self):
         p = self.profile_collection
         return GeoDataFrame(
-                            {"labels": self.labels_,
-                             "latitude": p.y,
-                             "longitude": p.x},
-                            geometry=points_from_xy(p.x, p.y),
-                            crs=p.crs
+            {"labels": self.labels_, "latitude": p.y, "longitude": p.x},
+            geometry=points_from_xy(p.x, p.y),
+            crs=p.crs,
         )
 
     _bounding_polygons = None
@@ -148,12 +146,12 @@ class DepthSeriesKMeans(TimeSeriesKMeans):
         if self._bounding_polygons is None:
             df = self.get_classified_coordinates()
             geoms = []
-            geomdata = {'label': []}
+            geomdata = {"label": []}
             for iclust in range(self.n_clusters):
                 df_members = df[df.labels == iclust]
                 bounds = BoundingPolies(df_members, radius_deg=self.radius_deg)
                 geoms.append(bounds.df_bound.geometry[0])
-                geomdata['label'].append(iclust)
+                geomdata["label"].append(iclust)
 
             crs = self.profile_collection.crs
             df = GeoDataFrame(geomdata, geometry=geoms, crs=crs)
@@ -168,7 +166,7 @@ class DepthSeriesKMeans(TimeSeriesKMeans):
     @requires_fit
     def classify_points(self, df_gpd):
         b_df = self.bounding_polygons
-        return sjoin(df_gpd, b_df, how='left', op='intersects')
+        return sjoin(df_gpd, b_df, how="left", op="intersects")
 
     @requires_fit
     def depth_stats(self):
@@ -177,7 +175,7 @@ class DepthSeriesKMeans(TimeSeriesKMeans):
         for lab in range(self.n_clusters):
             label_mask = self.labels_ == lab
             p = self.profile_collection.profiles
-            vals = p[label_mask, :][:,  self.depth_mask]
+            vals = p[label_mask, :][:, self.depth_mask]
             cval = self.cluster_centers_[lab, :].squeeze()
             stdvals = np.std(vals, axis=0)
             labstats = {

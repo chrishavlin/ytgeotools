@@ -14,7 +14,7 @@ def join_then_check_path(filename: str, dirname: str) -> Union[str, None]:
 
 
 class DataManager:
-    def __init__(self, priority=["fullpath", "envvar", "ytconfig"]):
+    def __init__(self, priority=None):
         """
         A file manager class
 
@@ -33,6 +33,8 @@ class DataManager:
 
             default order is ["fullpath", "envvar", "ytconfig"]
         """
+        if priority is None:
+            priority = ["fullpath", "envvar", "ytconfig"]
         self.envvar_dir = os.environ.get(_envvar, None)
         tdd = ytcfg.get("yt", "test_data_dir")
         if tdd == "/does/not/exist":

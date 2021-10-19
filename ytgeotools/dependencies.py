@@ -5,7 +5,8 @@ class DependencyChecker:
     def has_cartopy(self):
         if self._has_cartopy is None:
             try:
-                import cartopy
+                import cartopy  # noqa: F401
+
                 self._has_cartopy = True
             except ImportError:
                 self._has_cartopy = False
@@ -17,6 +18,8 @@ class DependencyChecker:
                 return func(*args, **kwargs)
             else:
                 raise ImportError("This method requires cartopy.")
+
         return wrapper
+
 
 dependency_checker = DependencyChecker()

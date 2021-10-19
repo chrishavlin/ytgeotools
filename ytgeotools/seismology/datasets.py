@@ -1,19 +1,21 @@
-from typing import Type, Union, Any, List
-from scipy.interpolate import interp1d
+from abc import ABC, abstractmethod
+from typing import Any, List, Type, Union
+
+import geopandas as gpd
 import numpy as np
+import pandas as pd
 import xarray as xr
 from numpy.typing import ArrayLike
 from scipy import spatial
+from scipy.interpolate import interp1d
 from unyt import unyt_quantity
-from abc import ABC, abstractmethod
+
 from ytgeotools.coordinate_transformations import geosphere2cart
 from ytgeotools.data_manager import data_manager as _dm
-from ytgeotools.ytgeotools import Dataset
-from ytgeotools.mapping import default_crs, validate_lons, successive_joins
-from ytgeotools.seismology.collections import ProfileCollection
-import geopandas as gpd
-import pandas as pd
 from ytgeotools.dependencies import dependency_checker
+from ytgeotools.mapping import default_crs, successive_joins, validate_lons
+from ytgeotools.seismology.collections import ProfileCollection
+from ytgeotools.ytgeotools import Dataset
 
 
 class GeoSpherical(Dataset):
@@ -23,11 +25,14 @@ class GeoSpherical(Dataset):
         latitude: ArrayLike,
         longitude: ArrayLike,
         depth: ArrayLike,
-        coord_order: list = ["latitude", "longitude", "depth"],
+        coord_order: list = None,
         use_neg_lons: bool = False,
         max_radius: float = 6371.0,
         crs: dict = default_crs,
     ):
+
+        if coord_order is None:
+            coord_order = ["latitude", "longitude", "depth"]
 
         self.max_radius = max_radius
 
@@ -47,7 +52,10 @@ class GeoSpherical(Dataset):
 
     @property
     def cartesian_coords(self) -> tuple:
-        "returns 3d arrays representing earth-centered cartesian coordinates of every grid point"
+        """
+        returns 3d arrays representing earth-centered cartesian coordinates of
+        every grid point
+        """
 
         if self._cartesian_coords is None:
             cmesh = np.meshgrid(
@@ -67,7 +75,8 @@ class GeoSpherical(Dataset):
     def cartesian_bbox(self):
         if self._cartesian_bbox is None:
             x, y, z = self.cartesian_coords
-            self._cartesian_bbox = np.array([[d.min(), d.max()] for d in [x, y, z]])
+            cbbox = np.array([[d.min(), d.max()] for d in [x, y, z]])
+            self._cartesian_bbox = cbbox
         return self._cartesian_bbox
 
     def convert_to_cartesian(self, latitude, longitude, depth, rescale):
@@ -297,7 +306,7 @@ class GeoSpherical(Dataset):
         lat = self.get_coord("latitude")
 
         var = getattr(self, field)
-        for rowid, row in surface_df.iterrows():
+        for _, row in surface_df.iterrows():
             lon_id = np.where(lon == row["longitude"])[0][0]
             lat_id = np.where(lat == row["latitude"])[0][0]
             if depth_mask is None:
@@ -323,16 +332,17 @@ class GeoSpherical(Dataset):
         return super().load_uniform_grid()
 
 
-def _query_trees(xdata: np.ndarray,
-                 ydata: np.ndarray,
-                 zdata: np.ndarray,
-                 interpChunk: int,
-                 fields: List[str],
-                 trees: dict,
-                 interpd: dict,
-                 orig_shape: tuple,
-                 max_dist: float,
-                 ) -> dict:
+def _query_trees(
+    xdata: np.ndarray,
+    ydata: np.ndarray,
+    zdata: np.ndarray,
+    interpChunk: int,
+    fields: List[str],
+    trees: dict,
+    interpd: dict,
+    orig_shape: tuple,
+    max_dist: float,
+) -> dict:
     # query the tree at each new grid point and weight nearest neighbors
     # by inverse distance. proceed in chunks.
     N_grid = len(xdata)
@@ -383,9 +393,12 @@ class XarrayGeoSpherical(GeoSpherical):
         filename: str,
         field_subset: Union[list] = None,
         coord_aliases: dict = None,
-        max_radius: Type[unyt_quantity] = unyt_quantity(6371.0, "km"),
+        max_radius: Union[float, int] = 6371.0,
+        radius_units: str = "km",
         use_neg_lons: bool = False,
     ):
+
+        max_radius = unyt_quantity(max_radius, radius_units)
 
         filename = _dm.validate_file(filename)
         with xr.open_dataset(filename) as ds:
@@ -402,9 +415,9 @@ class XarrayGeoSpherical(GeoSpherical):
             for f in field_subset:
                 if "_".join(list(getattr(ds, f).coords)) != co_hash:
                     raise ValueError(
-                        f"all fields must have the same coordinate ordering but {f} does not."
-                        " Please provide a field_subset containing only fields that have "
-                        "the same coordinate ordering."
+                        f"all fields must have the same coordinate ordering but "
+                        f"{f} does not. Please provide a field_subset containing "
+                        f"only fields that have the same coordinate ordering."
                     )
 
             # pull out our data values
@@ -434,7 +447,6 @@ class XarrayGeoSpherical(GeoSpherical):
 
 
 class ReferenceModel(ABC):
-
     @abstractmethod
     def interpolate_func(self):
         pass
@@ -467,11 +479,14 @@ class ReferenceModel1D(ReferenceModel):
         creating the interpolating function. This looks for points at the same
         depth and offsets them by a small value.
     """
-    def __init__(self,
-                 fieldname: str,
-                 depth: np.typing.ArrayLike,
-                 vals: np.typing.ArrayLike,
-                 disc_correction: bool = True):
+
+    def __init__(
+        self,
+        fieldname: str,
+        depth: np.typing.ArrayLike,
+        vals: np.typing.ArrayLike,
+        disc_correction: bool = True,
+    ):
         self.fieldname = fieldname
         self.depth = self._validate_array(depth)
         self.depth_range = (np.min(self.depth), np.max(self.depth))
@@ -495,15 +510,13 @@ class ReferenceModel1D(ReferenceModel):
                 eps_off = self.disc_off_eps
                 d_diffs = depth[1:] - depth[0:-1]  # will be 1 element smaller
                 disc_i = np.where(d_diffs == 0)[0]  # indices of discontinuties
-                depth[disc_i+1] = depth[disc_i+1] + eps_off
+                depth[disc_i + 1] = depth[disc_i + 1] + eps_off
 
             # build and return the interpolation function
             self._interpolate_func = interp1d(depth, vals)
         return self._interpolate_func
 
-    def evaluate(self,
-                 depths: np.typing.ArrayLike,
-                 method: str = "interp") -> Any:
+    def evaluate(self, depths: np.typing.ArrayLike, method: str = "interp") -> Any:
         if method == "interp":
             return self.interpolate_func(depths)
         elif method == "nearest":
@@ -511,7 +524,6 @@ class ReferenceModel1D(ReferenceModel):
 
 
 class ReferenceCollection:
-
     def __init__(self, ref_models: List[ReferenceModel1D]):
         self.reference_fields = []
         for ref_mod in ref_models:
@@ -519,10 +531,9 @@ class ReferenceCollection:
             self.reference_fields.append(ref_mod.fieldname)
 
 
-def load_1d_csv_ref(filename: str,
-                    depth_column: str,
-                    value_column: str,
-                    **kwargs: Any) -> Type[ReferenceModel1D]:
+def load_1d_csv_ref(
+    filename: str, depth_column: str, value_column: str, **kwargs: Any
+) -> Type[ReferenceModel1D]:
     """
 
     loads a 1D reference model from a CSV file
@@ -558,10 +569,9 @@ def load_1d_csv_ref(filename: str,
     return ReferenceModel1D(value_column, d, v, disc_correction=True)
 
 
-def load_1d_csv_ref_collection(filename: str,
-                               depth_column: str,
-                               value_columns: List[str] = None,
-                               **kwargs: Any) -> Type[ReferenceCollection]:
+def load_1d_csv_ref_collection(
+    filename: str, depth_column: str, value_columns: List[str] = None, **kwargs: Any
+) -> Type[ReferenceCollection]:
     """
 
     loads a 1D reference model collection from a CSV file
