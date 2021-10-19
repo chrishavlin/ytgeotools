@@ -57,7 +57,8 @@ jobs:
       id: isort
       run: |
         isort --version-number
-        isort . --check --diff --skip setup.py
+        isort ytgeotools --check --diff
+        isort tests --check --diff
 
   flynt:
     name: flynt
