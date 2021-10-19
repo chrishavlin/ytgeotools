@@ -57,7 +57,7 @@ jobs:
       id: isort
       run: |
         isort --version-number
-        isort . --check --diff
+        isort . --check --diff --skip setup.py
 
   flynt:
     name: flynt
