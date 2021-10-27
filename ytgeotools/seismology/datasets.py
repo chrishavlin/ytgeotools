@@ -15,13 +15,14 @@ from ytgeotools.data_manager import data_manager as _dm
 from ytgeotools.dependencies import dependency_checker
 from ytgeotools.mapping import default_crs, successive_joins, validate_lons
 from ytgeotools.seismology.collections import ProfileCollection
+from ytgeotools.typing import all_numbers
 from ytgeotools.ytgeotools import Dataset
 
 
 def _calculate_perturbation(
     ref_data: np.ndarray, field_data: np.ndarray, perturbation_type: str
 ) -> np.ndarray:
-    return_data = ref_data - field_data
+    return_data = field_data - ref_data
     if perturbation_type in ["percent", "fractional"]:
         return_data = return_data / ref_data
         if perturbation_type == "percent":
@@ -34,11 +35,11 @@ def _calculate_absolute(
 ) -> np.ndarray:
     # field_data is a perturbation, ref frame value
     if perturbation_type == "absolute":
-        return_data = ref_data - field_data
+        return_data = ref_data + field_data
     elif perturbation_type == "fractional":
-        return_data = ref_data * (1 - field_data)
+        return_data = ref_data * (1 + field_data)
     elif perturbation_type == "percent":
-        return_data = ref_data * (1 - field_data / 100)
+        return_data = ref_data * (1 + field_data / 100)
     return return_data
 
 
@@ -56,6 +57,13 @@ class ReferenceModel(ABC):
         if type(vals) == np.ndarray:
             return vals
         return np.asarray(vals)
+
+
+def _sanitize_ndarray(input_array: all_numbers) -> all_numbers:
+    if type(input_array) == np.ndarray:
+        if input_array.shape == ():
+            return input_array.item()
+    return input_array
 
 
 class ReferenceModel1D(ReferenceModel):
@@ -114,9 +122,33 @@ class ReferenceModel1D(ReferenceModel):
 
     def evaluate(self, depths: np.typing.ArrayLike, method: str = "interp") -> Any:
         if method == "interp":
-            return self.interpolate_func(depths)
+            return _sanitize_ndarray(self.interpolate_func(depths))
         elif method == "nearest":
             raise NotImplementedError
+
+    def perturbation(
+        self,
+        depths: np.typing.ArrayLike,
+        abs_vals: np.typing.ArrayLike,
+        method: str = "interp",
+        perturbation_type: str = "percent",
+    ) -> np.ndarray:
+
+        ref_vals = self.evaluate(depths, method=method)
+        pert = _calculate_perturbation(ref_vals, abs_vals, perturbation_type)
+        return _sanitize_ndarray(pert)
+
+    def absolute(
+        self,
+        depths: np.typing.ArrayLike,
+        pert_vals: np.typing.ArrayLike,
+        method: str = "interp",
+        perturbation_type: str = "percent",
+    ) -> np.ndarray:
+
+        ref_vals = self.evaluate(depths, method=method)
+        abs_vals = _calculate_absolute(ref_vals, pert_vals, perturbation_type)
+        return _sanitize_ndarray(abs_vals)
 
 
 class ReferenceCollection:
