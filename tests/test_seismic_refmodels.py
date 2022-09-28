@@ -3,12 +3,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ytgeotools.seismology.datasets import (
-    ReferenceCollection,
-    ReferenceModel1D,
-    load_1d_csv_ref,
-    load_1d_csv_ref_collection,
-)
+from ytgeotools._testing import create_fake_ds
+from ytgeotools.seismology import datasets as ysds
 
 
 @pytest.fixture
@@ -117,7 +113,7 @@ def ref1dmodeldepths():
     return depth
 
 
-def refmodel_tests_1d(ref_model: ReferenceModel1D):
+def refmodel_tests_1d(ref_model: ysds.ReferenceModel1D):
     # some checks on an instantiated 1d reference model
     assert ref_model.depth.shape == ref_model.vals.shape
 
@@ -132,10 +128,10 @@ def refmodel_tests_1d(ref_model: ReferenceModel1D):
     assert results.shape == test_dep.shape
 
 
-def refmodel_tests_1d_reversed(ref_model: ReferenceModel1D):
+def refmodel_tests_1d_reversed(ref_model: ysds.ReferenceModel1D):
     d_r = ref_model.depth[::-1]
     v_r = ref_model.vals[::-1]
-    ref_model_r = ReferenceModel1D("refmodel.csv", d_r, v_r)
+    ref_model_r = ysds.ReferenceModel1D("refmodel.csv", d_r, v_r)
 
     refmodel_tests_1d(ref_model_r)
     test_deps = np.linspace(ref_model.depth_range[0], ref_model.depth_range[1], 10)
@@ -145,19 +141,19 @@ def refmodel_tests_1d_reversed(ref_model: ReferenceModel1D):
 def test_1d_eval(tmpdir, ref1dmodeldepths, ref1dmodelvals):
 
     # check direct instantiation
-    ref_model = ReferenceModel1D("refmodel.csv", ref1dmodeldepths, ref1dmodelvals)
+    ref_model = ysds.ReferenceModel1D("refmodel.csv", ref1dmodeldepths, ref1dmodelvals)
     refmodel_tests_1d(ref_model)
 
     # test the load from disk. save a model to disc first
     df = pd.DataFrame({"depth": ref1dmodeldepths, "vs": ref1dmodelvals})
     fn = tmpdir.mkdir("modeldir").join("refmodel.csv")
     df.to_csv(str(fn), index=False)
-    ref_model = load_1d_csv_ref(fn, "depth", "vs")
+    ref_model = ysds.load_1d_csv_ref(fn, "depth", "vs")
     refmodel_tests_1d(ref_model)
 
     # check the kwargs
     df.to_csv(str(fn), index=False, sep="|")
-    ref_model = load_1d_csv_ref(fn, "depth", "vs", sep="|")
+    ref_model = ysds.load_1d_csv_ref(fn, "depth", "vs", sep="|")
     refmodel_tests_1d(ref_model)
 
     # check that reversed values also works and return the same values
@@ -168,14 +164,14 @@ def test_1d_eval_with_disc(ref1dmodeldepths, ref1dmodelvals):
     # build a new model with a discontinuity
     depth = np.concatenate([np.array([10, 20, 20, 21]), ref1dmodeldepths])
     vs = np.concatenate([np.array([2.0, 2.0, 4.0, 4.0]), ref1dmodelvals])
-    ref_model = ReferenceModel1D("refmodel.csv", depth, vs)
+    ref_model = ysds.ReferenceModel1D("refmodel.csv", depth, vs)
     vals = ref_model.evaluate([19, 19.9999, 20.0, 20.000001])
     assert np.all(vals[:-1] == 2.0)
     assert np.all(vals[-1] == 4.0)
 
 
 def test_1d_pert_abs(ref1dmodeldepths, ref1dmodelvals):
-    ref_model = ReferenceModel1D("refmodel.csv", ref1dmodeldepths, ref1dmodelvals)
+    ref_model = ysds.ReferenceModel1D("refmodel.csv", ref1dmodeldepths, ref1dmodelvals)
 
     test_dep = np.mean(ref_model.depth_range)
     value = ref_model.evaluate(test_dep)
@@ -205,13 +201,13 @@ def test_1d_pert_abs(ref1dmodeldepths, ref1dmodelvals):
 
 def test_ref_1d_collection(tmpdir, ref1dmodeldepths, ref1dmodelvals):
 
-    ref1 = ReferenceModel1D("vs", ref1dmodeldepths, ref1dmodelvals)
-    ref2 = ReferenceModel1D("vp", ref1dmodeldepths, ref1dmodelvals * 2.0)
-    refCollection = ReferenceCollection([ref1, ref2])
+    ref1 = ysds.ReferenceModel1D("vs", ref1dmodeldepths, ref1dmodelvals)
+    ref2 = ysds.ReferenceModel1D("vp", ref1dmodeldepths, ref1dmodelvals * 2.0)
+    refCollection = ysds.ReferenceCollection([ref1, ref2])
 
     for mod in ["vs", "vp"]:
         assert hasattr(refCollection, mod)
-        assert type(getattr(refCollection, mod)) == ReferenceModel1D
+        assert type(getattr(refCollection, mod)) == ysds.ReferenceModel1D
         refmodel_tests_1d(getattr(refCollection, mod))
 
     df = pd.DataFrame(
@@ -220,12 +216,25 @@ def test_ref_1d_collection(tmpdir, ref1dmodeldepths, ref1dmodelvals):
 
     fn = tmpdir.mkdir("modeldir").join("refmodelvsvp.csv")
     df.to_csv(str(fn), index=False)
-    refCollection = load_1d_csv_ref_collection(fn, "depth")
+    refCollection = ysds.load_1d_csv_ref_collection(fn, "depth")
     for mod in ["vs", "vp"]:
         assert hasattr(refCollection, mod)
-        assert type(getattr(refCollection, mod)) == ReferenceModel1D
+        assert type(getattr(refCollection, mod)) == ysds.ReferenceModel1D
         refmodel_tests_1d(getattr(refCollection, mod))
 
-    refCollection = load_1d_csv_ref_collection(fn, "depth", value_columns=["vp"])
+    refCollection = ysds.load_1d_csv_ref_collection(fn, "depth", value_columns=["vp"])
     assert hasattr(refCollection, "vs") is False
     assert hasattr(refCollection, "vp")
+
+
+def test_with_profiler(tmpdir, ref1dmodeldepths, ref1dmodelvals):
+    # just checks that it runs
+    ref1 = ysds.ReferenceModel1D("vs", ref1dmodeldepths, ref1dmodelvals)
+    ref2 = ysds.ReferenceModel1D("vp", ref1dmodeldepths, ref1dmodelvals * 2.0)
+    refCollection = ysds.ReferenceCollection([ref1, ref2])
+
+    ds = create_fake_ds(fields=["dvs", "dvp"])
+    _ = ds.profiler.get_absolute(refCollection, field="dvs", ref_model_field="vs")
+    _ = ds.profiler.get_perturbation(refCollection, field="dvs", ref_model_field="vs")
+    _ = ds.profiler.get_absolute(refCollection, field="dvp", ref_model_field="vp")
+    _ = ds.profiler.get_perturbation(refCollection, field="dvp", ref_model_field="vp")
