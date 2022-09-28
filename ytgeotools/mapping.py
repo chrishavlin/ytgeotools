@@ -273,6 +273,9 @@ def filter_by_bounds(df, b_df, return_interior=True, crs=default_crs):
 
 def successive_joins(df_left, df_right_list, drop_null=False, drop_inside=False):
 
+    if isinstance(df_right_list, list) is False:
+        df_right_list = [df_right_list]
+
     df = df_left.copy()
 
     if type(drop_null) is bool:
