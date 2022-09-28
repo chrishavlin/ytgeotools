@@ -2,53 +2,50 @@
 
 """Tests for `ytgeotools` package."""
 
-import numpy as np
-import yt
+import os
 
-from ytgeotools import ytgeotools
+import geopandas as gpd
+import pytest
+import xarray as xr
 
-
-def get_dataset(shp=(2, 3, 4), fields=("density",), cnms=("x", "y", "z")):
-    shp = (2, 3, 4)
-
-    data = {f: np.random.random(shp) for f in fields}
-    coords = {}
-    for cid, c in enumerate(cnms):
-        coords[cid] = {"values": np.linspace(0, 1, shp[cid]), "name": c}
-
-    return ytgeotools.Dataset(data, coords)
+import ytgeotools
+from ytgeotools._testing import save_fake_ds
 
 
-def check_field(ds, field, fshape):
-    assert field in ds.fields
-    assert hasattr(ds, field)
-    fvar = getattr(ds, field)
-    assert fvar.shape == fshape
+@pytest.fixture
+def on_disk_nc_file(tmp_path):
+    savedir = tmp_path / "data"
+    os.mkdir(savedir)
+    fname = savedir / "test_nc.nc"
+    save_fake_ds(fname, fields=["dvs", "Q"])
+    return fname
 
 
-def test_dataset():
-    # simple tests of instantiation and functionality of base dataset
-    test_fields = ("test1", "test2")
-    fshp = (2, 3, 4)
-    cnms = ("x", "y", "z")
-    ds = get_dataset(shp=fshp, fields=test_fields, cnms=cnms)
+def test_open_dataset(on_disk_nc_file):
+    ds = ytgeotools.open_dataset(on_disk_nc_file)
+    ds2 = xr.open_dataset(on_disk_nc_file)
 
-    for fld in test_fields:
-        check_field(ds, fld, fshp)
-
-    assert ds._coord_order == [c for c in cnms]
-    for cid, c in enumerate(cnms):
-        ds.get_coord(c).shape == (fshp[cid],)
+    for c in ds.coords:
+        assert c in ds2.coords
 
 
-def test_to_yt():
-    # simple tests of instantiation and functionality of base dataset
-    test_fields = ("test1", "test2")
-    fshp = (2, 3, 4)
-    cnms = ("x", "y", "z")
-    ds = get_dataset(shp=fshp, fields=test_fields, cnms=cnms)
+def test_profiler(on_disk_nc_file):
+    ds = ytgeotools.open_dataset(on_disk_nc_file)
+    assert hasattr(ds, "profiler")
 
-    yt_ds = ds.load_uniform_grid()
-    for f in test_fields:
-        assert ("stream", f) in yt_ds.field_list
-        assert type(yt_ds) == yt.frontends.stream.StreamDataset
+
+def test_surface_gpd(on_disk_nc_file):
+    ds = ytgeotools.open_dataset(on_disk_nc_file)
+
+    surf_gpd = ds.profiler.surface_gpd
+    assert isinstance(surf_gpd, gpd.GeoDataFrame)
+    surf_grid_size = ds.coords["longitude"].size * ds.coords["latitude"].size
+    assert len(surf_gpd) == surf_grid_size
+
+
+def test_profile_extraction(on_disk_nc_file):
+    ds = ytgeotools.open_dataset(on_disk_nc_file)
+    profiles = ds.profiler.get_profiles("Q")
+    gridsize = ds.coords["longitude"].size * ds.coords["latitude"].size
+    assert profiles.profiles.shape[0] == gridsize
+    assert profiles.profiles.shape[1] == ds.coords["depth"].size

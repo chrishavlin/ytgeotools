@@ -7,7 +7,6 @@ import numpy as np
 import xarray as xr
 import yt_xarray  # NOQA
 from scipy import spatial
-from yt import load_uniform_grid as lug
 
 import ytgeotools.mapping as ygm
 import ytgeotools.seismology.datasets as sds
@@ -422,61 +421,6 @@ for ref_name, aliases in zip(["latitude", "longitude"], [_latnames, _lonnames]):
         aliases + [a.upper() for a in aliases] + [a.capitalize() for a in aliases]
     )
     coord_aliases[ref_name] = full_list
-
-
-# abstract class
-class Dataset:
-
-    geometry = "cartesian"
-
-    def __init__(self, data: dict, coords: dict):
-        """
-        coords : dict
-            {0: {"values": xvals, "name":x},
-             1: {"values": yvals, "name":y},
-             2: {"values": zvals, "name":z},
-            }
-        """
-
-        self.fields = list(data.keys())
-
-        for fld, vals in data.items():
-            if len(vals.shape) != 3:
-                raise ValueError(f"data arrays must be 3d, {fld} is {len(vals.shape)}d")
-            setattr(self, fld, vals)
-
-        if all([dim in coords.keys() for dim in [0, 1, 2]]) is False:
-            raise ValueError("coords dictionary must contain values for 0, 1, 2")
-
-        self.coords = [coords[dim]["values"] for dim in range(3)]
-
-        self.bbox = np.array(
-            [[self.coords[dim].min(), self.coords[dim].max()] for dim in range(3)]
-        )
-        self._coord_order = [coords[dim]["name"] for dim in range(3)]
-        self._coord_hash = {dim: coords[dim]["name"] for dim in range(3)}
-        self._coord_hash_r = {coords[dim]["name"]: dim for dim in range(3)}
-
-    def get_coord(self, name: str):
-        dim_index = self._coord_hash_r[name]
-        return self.coords[dim_index]
-
-    def data_dict(self, field_subset: list = None) -> dict:
-        if field_subset is None:
-            field_subset = self.fields
-        return {f: getattr(self, f) for f in field_subset}
-
-    def load_uniform_grid(self):
-        return load_uniform_grid(self)
-
-
-def load_uniform_grid(ds: Type[Dataset], *args, **kwargs):
-
-    data = ds.data_dict()
-    sizes = data[list(data.keys())[0]].shape
-    dims = tuple(ds._coord_order)
-    geometry = (ds.geometry, (dims))
-    return lug(data, sizes, 1.0, *args, bbox=ds.bbox, geometry=geometry, **kwargs)
 
 
 def open_dataset(file, *args, **kwargs):
