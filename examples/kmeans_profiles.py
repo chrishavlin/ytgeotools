@@ -1,11 +1,11 @@
 import matplotlib.pyplot as plt
 
+import ytgeotools
 from ytgeotools.seismology.collections import DepthSeriesKMeans
-from ytgeotools.seismology.datasets import XarrayGeoSpherical
 
 vs_file = "IRIS/wUS-SH-2010_percent.nc"
-ds = XarrayGeoSpherical(vs_file)
-P = ds.get_profiles("dvs")
+ds = ytgeotools.open_dataset(vs_file)
+P = ds.profiler.get_profiles("dvs")
 
 model = DepthSeriesKMeans(P, n_clusters=3)
 model.fit()

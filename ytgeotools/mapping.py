@@ -11,6 +11,7 @@ from shapely.ops import cascaded_union
 from ytgeotools.data_manager import data_manager
 
 default_crs = {"init": "epsg:4326"}
+default_radius = 6371.0
 
 
 def validate_lons(lons, use_negative_lons=False):
