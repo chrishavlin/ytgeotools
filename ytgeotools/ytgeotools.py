@@ -102,7 +102,9 @@ class ProfilerAccessor:
 
         if df_gpds is not None:
             surface_df = self.filter_surface_gpd(
-                df_gpds, drop_null=drop_null, drop_inside=drop_inside,
+                df_gpds,
+                drop_null=drop_null,
+                drop_inside=drop_inside,
             )
 
             lons = surface_df.longitude.to_xarray()
@@ -121,7 +123,11 @@ class ProfilerAccessor:
 
             fvars = var.sel(sel_dict).values.transpose()
             return ProfileCollection(
-                fvars, depth.values, lons.values, lats.values, crs=self.crs,
+                fvars,
+                depth.values,
+                lons.values,
+                lats.values,
+                crs=self.crs,
             )
         else:
             # select all data, reshaping the full array into profiles

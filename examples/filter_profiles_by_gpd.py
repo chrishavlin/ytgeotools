@@ -28,10 +28,20 @@ volcanic_surface_pts = ds.profiler.filter_surface_gpd(
     volcanic_bound_df, drop_inside=True
 )
 
-profs_v = ds.profiler.get_profiles("dvs", df_gpds=[volcanic_bound_df,], drop_null=True)
+profs_v = ds.profiler.get_profiles(
+    "dvs",
+    df_gpds=[
+        volcanic_bound_df,
+    ],
+    drop_null=True,
+)
 
 profs_nv = ds.profiler.get_profiles(
-    "dvs", df_gpds=[volcanic_bound_df,], drop_inside=True
+    "dvs",
+    df_gpds=[
+        volcanic_bound_df,
+    ],
+    drop_inside=True,
 )
 
 nvolc = profs_v.profiles.shape[0]

@@ -94,8 +94,8 @@ def cart2sphere(
     x = np.asarray(x)
     y = np.asarray(y)
     z = np.asarray(z)
-    xy = x ** 2 + y ** 2
-    R = np.asarray(np.sqrt(xy + z ** 2))
+    xy = x**2 + y**2
+    R = np.asarray(np.sqrt(xy + z**2))
     phi = np.asarray(np.arccos(z / R))
     theta = np.asarray(np.arctan2(y, x))
     theta[theta < 0] = theta[theta < 0] + np.pi * 2

@@ -85,4 +85,8 @@ def test_filter_surface_gpd(on_disk_nc_file):
     with pytest.raises(
         ValueError, match="Only one of drop_na and drop_inside can be True"
     ):
-        _ = ds.profiler.filter_surface_gpd(df, drop_null=True, drop_inside=True,)
+        _ = ds.profiler.filter_surface_gpd(
+            df,
+            drop_null=True,
+            drop_inside=True,
+        )
