@@ -21,4 +21,13 @@ for i in range(model.n_clusters):
     plt.plot(model.cluster_centers_[i, :], model.profile_collection.depth, color=c[i])
 plt.gca().invert_yaxis()
 
+
+print("calculating kmeans inertia vs number of clusters")
+plt.figure()
+c_range = range(1, 11)
+models, inertia = model.multi_kmeans_fit(c_range)
+
+plt.plot(c_range, inertia)
+plt.xlabel("number of clusters")
+plt.ylabel("kmeans inertia")
 plt.show()

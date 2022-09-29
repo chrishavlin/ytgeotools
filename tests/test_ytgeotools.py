@@ -9,7 +9,7 @@ import pytest
 import xarray as xr
 
 import ytgeotools
-from ytgeotools._testing import save_fake_ds
+from ytgeotools._testing import geo_df_for_testing, save_fake_ds
 
 
 @pytest.fixture
@@ -49,3 +49,38 @@ def test_profile_extraction(on_disk_nc_file):
     gridsize = ds.coords["longitude"].size * ds.coords["latitude"].size
     assert profiles.profiles.shape[0] == gridsize
     assert profiles.profiles.shape[1] == ds.coords["depth"].size
+
+    # get profiles inside, outside some bounds
+    df = geo_df_for_testing()
+    dfl = list(df)
+    profiles_in = ds.profiler.get_profiles("Q", df_gpds=dfl, drop_null=True)
+    profiles_out = ds.profiler.get_profiles("Q", df_gpds=dfl, drop_inside=True)
+    n_out = profiles_out.profiles.shape[0]
+    n_in = profiles_in.profiles.shape[0]
+    assert n_in > 0
+    assert n_out > 0
+    assert profiles_out.profiles.shape[1] == ds.coords["depth"].size
+    assert n_out < gridsize
+    assert n_in < gridsize
+    assert n_in + n_out == gridsize
+
+
+def test_filter_surface_gpd(on_disk_nc_file):
+    ds = ytgeotools.open_dataset(on_disk_nc_file)
+    df = geo_df_for_testing()
+    df_inside = ds.profiler.filter_surface_gpd(df, drop_null=True)
+    df_outside = ds.profiler.filter_surface_gpd(df, drop_inside=True)
+    df_all = ds.profiler.filter_surface_gpd(df)
+
+    assert len(df_inside) > 0
+    assert len(df_outside) > 0
+    assert len(df_all) > 0
+    assert len(df_outside) < len(df_all)
+    assert len(df_inside) < len(df_all)
+    assert len(df_outside) + len(df_inside) == len(df_all)
+
+    # should error:
+    with pytest.raises(
+        ValueError, match="Only one of drop_na and drop_inside can be True"
+    ):
+        _ = ds.profiler.filter_surface_gpd(df, drop_null=True, drop_inside=True,)

@@ -24,6 +24,7 @@ class ProfilerAccessor:
         self.crs = ygm.default_crs
         self.max_radius = ygm.default_radius
         self._interp_trees = {}
+        self._has_neg_lons = np.any(self._obj.longitude < 0)
 
     def set_crs(self, new_crs):
         self.crs = new_crs
@@ -72,9 +73,11 @@ class ProfilerAccessor:
             f"dictionary."
         )
 
-    def get_coord(self, name: str):
+    def get_coord(self, name: str, copy: bool = True):
         name = self._validate_coord_name(name)
         coord = self._obj[name]
+        if copy:
+            coord = coord.copy()
         if name in coord_aliases["longitude"]:
             coord = ygm.validate_lons(coord.values)
         return coord
@@ -91,48 +94,47 @@ class ProfilerAccessor:
         df_gpds: list = None,
         depth_mask=None,
         drop_null=False,
-        drop_inside=False,  # returns
+        drop_inside=False,
     ) -> ProfileCollection:
 
-        # yikes, need to handle coord order properly!!!!
-        warnings.warn("has the coord order issue been fixed yet?")
+        warnings.warn("assuming index order of depth, lat, lon...")
+        var = getattr(self._obj, field)
 
         if df_gpds is not None:
             surface_df = self.filter_surface_gpd(
                 df_gpds, drop_null=drop_null, drop_inside=drop_inside,
             )
+
+            lons = surface_df.longitude.to_xarray()
+            lats = surface_df.latitude.to_xarray()
+            if self._has_neg_lons:
+                # surface_df will be 0, 360 always, offset values
+                lon_mask = lons > 180.0
+                lons[lon_mask] = lons[lon_mask] - 360.0
+                del lon_mask
+
+            depth = self.get_coord("depth")
+            sel_dict = {"longitude": lons, "latitude": lats}
+            if depth_mask is not None:
+                depth = depth[depth_mask]
+                sel_dict["depth"] = depth_mask
+
+            fvars = var.sel(sel_dict).values.transpose()
+            return ProfileCollection(
+                fvars, depth.values, lons.values, lats.values, crs=self.crs,
+            )
         else:
-            surface_df = self.surface_gpd
-
-        raw_profiles = []
-        crds = []
-        lon = self.get_coord("longitude")
-        lat = self.get_coord("latitude")
-
-        var = getattr(self._obj, field)
-        for _, row in surface_df.iterrows():
-            # this is slow and should/could be vectorized
-            lon_id = np.where(lon == row["longitude"])[0][0]
-            lat_id = np.where(lat == row["latitude"])[0][0]
-
-            # the following:
-            if depth_mask is None:
-                fvars = var[:, lat_id, lon_id]
-            else:
-                fvars = var[depth_mask, lat_id, lon_id]
-
-            raw_profiles.append(fvars[:])
-            crds.append((row["latitude"], row["longitude"]))
-
-        crds = np.array(crds)
-
-        return ProfileCollection(
-            np.array(raw_profiles),
-            self.get_coord("depth"),
-            crds[:, 1],
-            crds[:, 0],
-            crs=self.crs,
-        )
+            # select all data, reshaping the full array into profiles
+            ndepth = len(var.depth)
+            nlon = len(var.longitude)
+            nlat = len(var.latitude)
+            fvars = var.values.reshape((ndepth), nlon * nlat).transpose()
+            depth = self.get_coord("depth")
+            if depth_mask is not None:
+                fvars = fvars[depth_mask, :]
+                depth = depth[depth_mask]
+            y, x = self.latlon_grid
+            return ProfileCollection(fvars, depth, x.ravel(), y.ravel(), crs=self.crs)
 
     _cartesian_coords = None
 

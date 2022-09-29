@@ -113,7 +113,7 @@ class PolygonFile(OnDiskGeometry):
 def build_bounding_df(latitudes, longitudes, crs=None, description="bounding_poly"):
 
     if crs is None:
-        crs = {"init": "epsg:4326"}
+        crs = default_crs
 
     poly = Polygon([[p[0], p[1]] for p in zip(longitudes, latitudes)])
 
