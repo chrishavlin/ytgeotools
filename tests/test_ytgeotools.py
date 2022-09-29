@@ -52,7 +52,9 @@ def test_profile_extraction(on_disk_nc_file):
 
     # get profiles inside, outside some bounds
     df = geo_df_for_testing()
-    dfl = list(df)
+    dfl = [
+        df,
+    ]
     profiles_in = ds.profiler.get_profiles("Q", df_gpds=dfl, drop_null=True)
     profiles_out = ds.profiler.get_profiles("Q", df_gpds=dfl, drop_inside=True)
     n_out = profiles_out.profiles.shape[0]
