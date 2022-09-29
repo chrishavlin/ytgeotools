@@ -16,7 +16,6 @@ requirements = [
     "h5py",
     "scipy",
     "geopandas",
-    "yt-idv",
     "shapely",
     "xarray",
     "sklearn",
