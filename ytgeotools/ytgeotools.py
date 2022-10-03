@@ -1,5 +1,4 @@
 """Main module."""
-import warnings
 from typing import List, Type, Union
 
 import geopandas as gpd
@@ -97,8 +96,8 @@ class ProfilerAccessor:
         drop_inside=False,
     ) -> ProfileCollection:
 
-        warnings.warn("assuming index order of depth, lat, lon...")
         var = getattr(self._obj, field)
+        _temporary_strick_coord_order(var)
 
         if df_gpds is not None:
             surface_df = self.filter_surface_gpd(
@@ -429,8 +428,20 @@ for ref_name, aliases in zip(["latitude", "longitude"], [_latnames, _lonnames]):
         aliases + [a.upper() for a in aliases] + [a.capitalize() for a in aliases]
     )
     coord_aliases[ref_name] = full_list
+coord_aliases["depth"] = ["depth"]
 
 
 def open_dataset(file, *args, **kwargs):
     file = _dm.validate_file(file)
     return xr.open_dataset(file, *args, **kwargs)
+
+
+def _temporary_strick_coord_order(xr_var):
+    required_order = ["depth", "latitude", "longitude"]
+
+    actual = list(xr_var.coords)
+    for coord, req in zip(actual, required_order):
+        if coord not in coord_aliases[req]:
+            raise NotImplementedError(
+                "variables require coords if (depth, lat, lon) at present."
+            )
