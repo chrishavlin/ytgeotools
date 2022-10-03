@@ -72,6 +72,8 @@ class ReferenceModel1D(ReferenceModel):
         if True (the default), will apply a discontinuity correction before
         creating the interpolating function. This looks for points at the same
         depth and offsets them by a small value.
+    disc_offset: np.float
+        the offset to use if disc_correction is True.
     """
 
     def __init__(
@@ -80,13 +82,14 @@ class ReferenceModel1D(ReferenceModel):
         depth: np.typing.ArrayLike,
         vals: np.typing.ArrayLike,
         disc_correction: bool = True,
+        disc_offset: np.float = np.finfo(float).eps,
     ):
         self.fieldname = fieldname
         self.depth = self._validate_array(depth)
         self.depth_range = (np.min(self.depth), np.max(self.depth))
         self.vals = self._validate_array(vals)
         self.disc_correction = disc_correction
-        self.disc_off_eps = np.finfo(float).eps
+        self.disc_off_eps = disc_offset
 
     _interpolate_func = None
 
