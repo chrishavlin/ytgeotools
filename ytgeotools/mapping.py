@@ -290,7 +290,7 @@ def successive_joins(df_left, df_right_list, drop_null=False, drop_inside=False)
         if dnull and dins:
             raise ValueError("Only one of drop_na and drop_inside can be True")
 
-        df = gpd.sjoin(df, df_r, how="left", op="intersects")
+        df = gpd.sjoin(df, df_r, how="left", predicate="intersects")
 
         if dnull:
             df = df[~pd_isnull(df["index_right"])]

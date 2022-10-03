@@ -15,7 +15,7 @@ requirements = [
     "netcdf4",
     "h5py",
     "scipy",
-    "geopandas",
+    "geopandas>=0.11.1",
     "shapely",
     "xarray",
     "sklearn",
