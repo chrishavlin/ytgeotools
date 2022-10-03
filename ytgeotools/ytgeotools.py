@@ -4,13 +4,13 @@ from typing import Dict, List, Optional, Type, Union
 import geopandas as gpd
 import numpy as np
 import xarray as xr
-import yt_xarray  # NOQA
 from scipy import spatial
 
 import ytgeotools.mapping as ygm
 import ytgeotools.seismology.datasets as sds
 from ytgeotools.coordinate_transformations import geosphere2cart
 from ytgeotools.data_manager import data_manager as _dm
+from ytgeotools.dependencies import dependency_checker
 from ytgeotools.seismology.collections import ProfileCollection
 
 
@@ -232,6 +232,11 @@ class ProfilerAccessor:
             }
         """
 
+        # check yt first if it is being used
+        if return_yt is True:
+            if dependency_checker.has_yt is False:
+                raise RuntimeError("this functionality requires yt.")
+
         # set the bounding cartesian box of the interpolated grid
         if subselect_bbox:
             for k, v in subselect_bbox.items():
@@ -332,7 +337,7 @@ class ProfilerAccessor:
                 interpd[key] = funchandle(interpd[key])
 
         if return_yt:
-            raise NotImplementedError
+            print("building uniform grid")
 
         if len(interpd) == 1:
             interpd = interpd[fields[0]]
