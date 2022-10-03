@@ -1,7 +1,7 @@
 import numpy as np
 import yt_idv
 
-from ytgeotools.seismology.datasets import XarrayGeoSpherical
+import ytgeotools
 
 
 def refill(vals):
@@ -11,8 +11,8 @@ def refill(vals):
 
 
 filename = "IRIS/NWUS11-S_percent.nc"
-ds = XarrayGeoSpherical(filename)
-ds_yt = ds.interpolate_to_uniform_cartesian(
+ds = ytgeotools.open_dataset(filename)
+ds_yt = ds.profiler.interpolate_to_uniform_cartesian(
     ["dvs"],
     N=50,
     max_dist=50,

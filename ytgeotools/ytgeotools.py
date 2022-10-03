@@ -337,7 +337,15 @@ class ProfilerAccessor:
                 interpd[key] = funchandle(interpd[key])
 
         if return_yt:
-            print("building uniform grid")
+            import yt  # noqa
+
+            shp = interpd[fields[0]].shape
+            n_cart_bbox = np.zeros((3, 2))
+            for dim in range(3):
+                n_cart_bbox[dim][0] = xyz[dim].min()
+                n_cart_bbox[dim][1] = xyz[dim].max()
+
+            return yt.load_uniform_grid(interpd, shp, bbox=n_cart_bbox)
 
         if len(interpd) == 1:
             interpd = interpd[fields[0]]
