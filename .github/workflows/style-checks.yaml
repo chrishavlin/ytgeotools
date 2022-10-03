@@ -39,7 +39,6 @@ jobs:
       run: |
         black --version
         black --check --diff ytgeotools/
-        black --check --diff tests/
 
   isort:
     name: isort
