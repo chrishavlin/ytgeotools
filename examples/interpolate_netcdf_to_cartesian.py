@@ -10,6 +10,6 @@ x, y, z, dvs = ds.profiler.interpolate_to_uniform_cartesian(["dvs"])
 plt.hist(dvs[~isnan(dvs)].ravel(), bins=100)
 plt.show()
 
-x, y, z, dvs = ds.profiler.interpolate_to_uniform_cartesian(["dvs"], N=300)
+x, y, z, dvs = ds.profiler.interpolate_to_uniform_cartesian(["dvs"], N=100)
 plt.hist(dvs[~isnan(dvs)].ravel(), bins=100)
 plt.show()

@@ -3,7 +3,7 @@ import yt_idv
 from yt_idv.scene_components.blocks import BlockRendering
 from yt_idv.scene_data.block_collection import BlockCollection
 
-from ytgeotools.seismology.datasets import XarrayGeoSpherical
+import ytgeotools
 
 
 def refill(vals):
@@ -19,8 +19,8 @@ def refill2(vals):
 
 
 filename = "IRIS/NWUS11-S_percent.nc"
-ds = XarrayGeoSpherical(filename)
-ds_yt = ds.interpolate_to_uniform_cartesian(
+ds = ytgeotools.open_dataset(filename)
+ds_yt = ds.profiler.interpolate_to_uniform_cartesian(
     ["dvs"],
     N=100,
     return_yt=True,
@@ -28,7 +28,7 @@ ds_yt = ds.interpolate_to_uniform_cartesian(
     apply_functions={"dvs": [refill, np.abs]},
 )
 
-ds_yt_2 = ds.interpolate_to_uniform_cartesian(
+ds_yt_2 = ds.profiler.interpolate_to_uniform_cartesian(
     ["dvs"],
     N=100,
     return_yt=True,

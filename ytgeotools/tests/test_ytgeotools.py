@@ -90,3 +90,24 @@ def test_filter_surface_gpd(on_disk_nc_file):
             drop_null=True,
             drop_inside=True,
         )
+
+
+def test_interpolate_to_cartesian(on_disk_nc_file):
+
+    ds = ytgeotools.open_dataset(on_disk_nc_file)
+    x, y, z, d = ds.profiler.interpolate_to_uniform_cartesian(
+        ["dvs"],
+        N=20,
+        return_yt=False,
+        rescale_coords=True,
+    )
+    assert d.shape == (20, 20, 20)
+
+    ds_yt = ds.profiler.interpolate_to_uniform_cartesian(
+        ["dvs"],
+        N=20,
+        return_yt=True,
+        rescale_coords=True,
+    )
+    assert hasattr(ds_yt, "sphere")
+    assert ("stream", "dvs") in ds_yt.field_list
