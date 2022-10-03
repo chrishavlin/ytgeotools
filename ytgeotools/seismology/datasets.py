@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, List, Type
+from typing import Any, List, Optional, Type
 
 import numpy as np
 import pandas as pd
@@ -65,7 +65,7 @@ class ReferenceModel1D(ReferenceModel):
     fieldname : str
         the name of the reference fild
     depth : ArrayLike
-        array-like depth values for the reference model
+        array-like depth values for the reference model, will be cast to float64
     vals : Arraylike
         array-like model values
     disc_correction : bool
@@ -82,13 +82,16 @@ class ReferenceModel1D(ReferenceModel):
         depth: np.typing.ArrayLike,
         vals: np.typing.ArrayLike,
         disc_correction: bool = True,
-        disc_offset: np.float = np.finfo(float).eps,
+        disc_offset: Optional[float] = None,
     ):
         self.fieldname = fieldname
-        self.depth = self._validate_array(depth)
+        depth_in = self._validate_array(depth)
+        self.depth = depth_in.astype(np.float64)
         self.depth_range = (np.min(self.depth), np.max(self.depth))
         self.vals = self._validate_array(vals)
         self.disc_correction = disc_correction
+        if disc_offset is None:
+            disc_offset = np.finfo(float).eps * 10.0
         self.disc_off_eps = disc_offset
 
     _interpolate_func = None
@@ -103,10 +106,9 @@ class ReferenceModel1D(ReferenceModel):
             if self.disc_correction:
                 # deal with discontinuities
                 # offset disc depths by a small number
-                # disc_vals=[]
                 eps_off = self.disc_off_eps
                 d_diffs = depth[1:] - depth[0:-1]  # will be 1 element smaller
-                disc_i = np.where(d_diffs == 0)[0]  # indices of discontinuties
+                disc_i = np.where(d_diffs == 0)[0]  # indices of discontinuities
                 depth[disc_i + 1] = depth[disc_i + 1] + eps_off
 
             # build and return the interpolation function
