@@ -1,5 +1,5 @@
 """Main module."""
-from typing import List, Type, Union
+from typing import Dict, List, Optional, Type, Union
 
 import geopandas as gpd
 import numpy as np
@@ -192,13 +192,14 @@ class ProfilerAccessor:
     def interpolate_to_uniform_cartesian(
         self,
         fields: List[str],
-        N: int = 50,
-        max_dist: Union[int, float] = 100,
-        interpChunk: int = 500000,
-        recylce_trees: bool = False,
-        return_yt: bool = False,
-        rescale_coords: bool = False,
-        apply_functions: dict = None,
+        N: Optional[int] = 50,
+        max_dist: Optional[Union[int, float]] = 100,
+        interpChunk: Optional[int] = 500000,
+        recylce_trees: Optional[bool] = False,
+        return_yt: Optional[bool] = False,
+        rescale_coords: Optional[bool] = False,
+        apply_functions: Optional[dict] = None,
+        subselect_bbox: Optional[Dict[str, Union[tuple, list]]] = None,
     ):
         """
         moves geo-spherical data (radius/depth, lat, lon) to earth-centered
@@ -223,13 +224,34 @@ class ProfilerAccessor:
             a dictionary with fields as keys, pointing to a list of callable
             functions that get applied to the the interpolated field. Functions
             must accept and return an ndarray.
+        subselect_bbox: dict
+            bounds of a subselection (optional).
+            {'latitude': [minlat, maxlat],
+             'longitude': [minlon, maxlon]
+             'radius': [minradius, maxradius]
+            }
         """
+
+        # set the bounding cartesian box of the interpolated grid
+        if subselect_bbox:
+            for k, v in subselect_bbox.items():
+                subselect_bbox[k] = np.asarray(v)
+                xb, yb, zb = geosphere2cart(
+                    subselect_bbox["latitude"],
+                    subselect_bbox["longitude"],
+                    subselect_bbox["radius"],
+                )
+            cart_bbox = np.array([[d.min(), d.max()] for d in [xb, yb, zb]])
+        else:
+            cart_bbox = self.cartesian_bbox
+
+        full_cart_bbox = self.cartesian_bbox
+        full_wids = np.abs(full_cart_bbox[:, 1] - full_cart_bbox[:, 0])
 
         if apply_functions is None:
             apply_functions = {}
 
         x, y, z = self.cartesian_coords  # the actual xyz at which we have data
-        cart_bbox = self.cartesian_bbox
 
         # drop points at which we don't have data
         wids = np.abs(cart_bbox[:, 1] - cart_bbox[:, 0])
@@ -248,9 +270,10 @@ class ProfilerAccessor:
             if recylce_trees and field in self._interp_trees:
                 trees[field] = self._interp_trees[field]
             else:
-                x_fi = xdata[data != fillval]
-                y_fi = ydata[data != fillval]
-                z_fi = zdata[data != fillval]
+                dmask = data != fillval
+                x_fi = (xdata[dmask] - full_cart_bbox[0][0]) / full_wids[0]
+                y_fi = (ydata[dmask] - full_cart_bbox[1][0]) / full_wids[1]
+                z_fi = (zdata[dmask] - full_cart_bbox[2][0]) / full_wids[2]
                 data = data[data != fillval]
                 xyz = np.column_stack((x_fi, y_fi, z_fi))
                 print("building kd tree for " + field)
@@ -273,16 +296,27 @@ class ProfilerAccessor:
         if parallel_query:
             raise NotImplementedError
         else:
+            nxdata = (xdata - full_cart_bbox[0][0]) / full_wids[0]
+            nydata = (ydata - full_cart_bbox[1][0]) / full_wids[1]
+            nzdata = (zdata - full_cart_bbox[2][0]) / full_wids[2]
+
+            # kd-tree max dists is sum over all kdtree dimensions, calculate
+            # allowable dist assume same physical dist in each dimension
+            # this is needed since we rescaled the kdtree from 0 to 1 in every
+            # dimension
+            max_dists = np.array([max_dist / full_wids[i] for i in range(3)])
+            nmax_dist = np.sqrt(np.sum(max_dists * max_dists))
+
             interpd = _query_trees(
-                xdata,
-                ydata,
-                zdata,
+                nxdata,
+                nydata,
+                nzdata,
                 interpChunk,
                 fields,
                 trees,
                 interpd,
                 orig_shape,
-                max_dist,
+                nmax_dist,
             )
 
         if recylce_trees:
