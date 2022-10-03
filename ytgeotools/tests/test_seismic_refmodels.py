@@ -1,4 +1,3 @@
-# contents of conftest.py
 import numpy as np
 import pandas as pd
 import pytest
@@ -165,7 +164,7 @@ def test_1d_eval_with_disc(ref1dmodeldepths, ref1dmodelvals):
     depth = np.concatenate([np.array([10, 20, 20, 21]), ref1dmodeldepths])
     vs = np.concatenate([np.array([2.0, 2.0, 4.0, 4.0]), ref1dmodelvals])
     ref_model = ysds.ReferenceModel1D("refmodel.csv", depth, vs)
-    vals = ref_model.evaluate([19, 19.9999, 20.0, 20.000001])
+    vals = ref_model.evaluate([19.0, 19.9999, 20.0, 20.000001])
     assert np.all(vals[:-1] == 2.0)
     assert np.all(vals[-1] == 4.0)
 

@@ -16,8 +16,9 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Setup yt_idv
+    - name: Setup ytgeotools
       run: |
+        python -m pip install git+https://github.com/data-exp-lab/yt_xarray/
         python -m pip install -e .
     - name: Install test requirements
       run: |

@@ -10,7 +10,7 @@ from shapely.ops import cascaded_union
 
 from ytgeotools.data_manager import data_manager
 
-default_crs = {"init": "epsg:4326"}
+default_crs = "epsg:4326"
 default_radius = 6371.0
 
 
