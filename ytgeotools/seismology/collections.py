@@ -1,4 +1,4 @@
-from typing import Type
+from typing import Optional, Type
 
 import numpy as np
 from dask import compute, delayed
@@ -21,6 +21,7 @@ class ProfileCollection:
     @property
     def surface_df(self):
         if self._surface_df is None:
+
             df = GeoDataFrame(
                 {"longitude": self.x, "latitude": self.y},
                 geometry=points_from_xy(self.x, self.y),
@@ -32,6 +33,24 @@ class ProfileCollection:
     def get_surface_union(self, *args, **kwargs):
         bp = BoundingPolies(self.surface_df, *args, **kwargs)
         return GeoDataFrame(geometry=bp.df_bound.geometry, crs=self.crs)
+
+    _use_negative_lons = False
+
+    def toggle_negative_lons(self, new_value: Optional[bool] = None):
+        self._surface_df = None
+        if new_value is not None:
+            self._use_negative_lons = new_value
+        else:
+            self._use_negative_lons = not self._use_negative_lons
+
+        xvals = self.x
+        if self._use_negative_lons:
+            xmask = xvals > 180.0
+            xvals[xmask] = xvals[xmask] - 360.0
+        else:
+            xmask = xvals < 0.0
+            xvals[xmask] = xvals[xmask] + 360.0
+        self.x = xvals
 
 
 def fit_kmeans(profile_collection, n_clusters=3, **kwargs):
