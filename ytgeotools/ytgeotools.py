@@ -486,9 +486,9 @@ def open_dataset(file, *args, **kwargs):
 def _temporary_strick_coord_order(xr_var):
     required_order = ["depth", "latitude", "longitude"]
 
-    actual = list(xr_var.coords)
+    actual = list(xr_var.dims)
     for coord, req in zip(actual, required_order):
         if coord not in coord_aliases[req]:
             raise NotImplementedError(
-                "variables require coords if (depth, lat, lon) at present."
+                "variables require dim order of (depth, lat, lon) at present."
             )
