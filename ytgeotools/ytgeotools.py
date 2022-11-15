@@ -97,7 +97,7 @@ class ProfilerAccessor:
     ) -> ProfileCollection:
 
         var = getattr(self._obj, field)
-        _temporary_strick_coord_order(var)
+        _temporary_strict_coord_order(var)
 
         if df_gpds is not None:
             surface_df = self.filter_surface_gpd(
@@ -483,7 +483,7 @@ def open_dataset(file, *args, **kwargs):
     return xr.open_dataset(file, *args, **kwargs)
 
 
-def _temporary_strick_coord_order(xr_var):
+def _temporary_strict_coord_order(xr_var):
     required_order = ["depth", "latitude", "longitude"]
 
     actual = list(xr_var.dims)
