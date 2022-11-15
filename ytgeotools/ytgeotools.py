@@ -97,15 +97,19 @@ class ProfilerAccessor:
     ) -> ProfileCollection:
 
         var = getattr(self._obj, field)
-        _temporary_strict_coord_order(var)
+
+        depth_sel = {}
+        if depth_mask is not None:
+            depth = self.get_coord("depth")
+            depth_sel["depth"] = depth[depth_mask]
 
         if df_gpds is not None:
+            # find the surface points falling within the provided dataframe
             surface_df = self.filter_surface_gpd(
                 df_gpds,
                 drop_null=drop_null,
                 drop_inside=drop_inside,
             )
-
             lons = surface_df.longitude.to_xarray()
             lats = surface_df.latitude.to_xarray()
             if self._has_neg_lons:
@@ -113,33 +117,33 @@ class ProfilerAccessor:
                 lon_mask = lons > 180.0
                 lons[lon_mask] = lons[lon_mask] - 360.0
                 del lon_mask
-
-            depth = self.get_coord("depth")
-            sel_dict = {"longitude": lons, "latitude": lats}
-            if depth_mask is not None:
-                depth = depth[depth_mask]
-                sel_dict["depth"] = depth_mask
-
-            fvars = var.sel(sel_dict).values.transpose()
-            return ProfileCollection(
-                fvars,
-                depth.values,
-                lons.values,
-                lats.values,
-                crs=self.crs,
-            )
+            sel_dict = {}
+            sel_dict["longitude"] = lons
+            sel_dict["latitude"] = lats
+            fvars = var.sel(sel_dict)
+            fvars = fvars.sel(depth_sel)
+            lon_vals = lons.values
+            lat_vals = lats.values
+            depth_vals = fvars.depth.values
+            fvars = fvars.transpose("index", "depth").values
         else:
-            # select all data, reshaping the full array into profiles
-            ndepth = len(var.depth)
-            nlon = len(var.longitude)
-            nlat = len(var.latitude)
-            fvars = var.values.reshape((ndepth), nlon * nlat).transpose()
-            depth = self.get_coord("depth")
-            if depth_mask is not None:
-                fvars = fvars[depth_mask, :]
-                depth = depth[depth_mask]
-            y, x = self.latlon_grid
-            return ProfileCollection(fvars, depth, x.ravel(), y.ravel(), crs=self.crs)
+            fvars = var.sel(depth_sel)
+            depth_vals = fvars.depth.values
+            lon_vals = fvars.longitude.values
+            lat_vals = fvars.latitude.values
+
+            # combine the lat/lon grid into 1d dimension then reorder to ensure
+            # depth first and extract the 2d array
+            fvars = fvars.stack(surface_pts=("latitude", "longitude"))
+            fvars = fvars.transpose("surface_pts", "depth").values
+
+        return ProfileCollection(
+            fvars,
+            depth_vals,
+            lon_vals,
+            lat_vals,
+            crs=self.crs,
+        )
 
     _cartesian_coords = None
 
@@ -481,14 +485,3 @@ coord_aliases["depth"] = ["depth"]
 def open_dataset(file, *args, **kwargs):
     file = _dm.validate_file(file)
     return xr.open_dataset(file, *args, **kwargs)
-
-
-def _temporary_strict_coord_order(xr_var):
-    required_order = ["depth", "latitude", "longitude"]
-
-    actual = list(xr_var.dims)
-    for coord, req in zip(actual, required_order):
-        if coord not in coord_aliases[req]:
-            raise NotImplementedError(
-                "variables require dim order of (depth, lat, lon) at present."
-            )
