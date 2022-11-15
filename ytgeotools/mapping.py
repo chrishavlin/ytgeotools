@@ -265,7 +265,7 @@ def filter_by_bounds(df, b_df, return_interior=True, crs=default_crs):
         df_gpd = df
 
     # spatial join of the two geodataframes
-    df_s = gpd.sjoin(b_df, df_gpd, how="right", op="intersects")
+    df_s = gpd.sjoin(b_df, df_gpd, how="right", predicate="intersects")
     if return_interior:
         return df_s[~pd.isnull(df_s["index_left"])]
     else:
