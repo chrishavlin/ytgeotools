@@ -91,17 +91,17 @@ class ProfilerAccessor:
         self,
         field: str,
         df_gpds: list = None,
-        depth_mask=None,
+        vertical_mask=None,
         drop_null=False,
         drop_inside=False,
     ) -> ProfileCollection:
 
         var = getattr(self._obj, field)
-
-        depth_sel = {}
-        if depth_mask is not None:
-            depth = self.get_coord("depth")
-            depth_sel["depth"] = depth[depth_mask]
+        vert_name = _get_vertical_coord_name(var)
+        vertical_sel = {}
+        if vertical_mask is not None:
+            depth = _get_vertical_coord(var)
+            vertical_sel[vert_name] = depth[vertical_mask]
 
         if df_gpds is not None:
             # find the surface points falling within the provided dataframe
@@ -121,13 +121,13 @@ class ProfilerAccessor:
             sel_dict["longitude"] = lons
             sel_dict["latitude"] = lats
             fvars = var.sel(sel_dict)
-            fvars = fvars.sel(depth_sel)
+            fvars = fvars.sel(vertical_sel)
             lon_vals = lons.values
             lat_vals = lats.values
-            depth_vals = fvars.depth.values
-            fvars = fvars.transpose("index", "depth").values
+            depth_vals = getattr(fvars, vert_name).values
+            fvars = fvars.transpose("index", vert_name).values
         else:
-            fvars = var.sel(depth_sel)
+            fvars = var.sel(vertical_sel)
             depth_vals = fvars.depth.values
             lon_vals = fvars.longitude.values
             lat_vals = fvars.latitude.values
@@ -135,7 +135,7 @@ class ProfilerAccessor:
             # combine the lat/lon grid into 1d dimension then reorder to ensure
             # depth first and extract the 2d array
             fvars = fvars.stack(surface_pts=("latitude", "longitude"))
-            fvars = fvars.transpose("surface_pts", "depth").values
+            fvars = fvars.transpose("surface_pts", vert_name).values
 
         return ProfileCollection(
             fvars,
@@ -164,7 +164,8 @@ class ProfilerAccessor:
 
     def _get_lat_lon_depth_grid(self):
 
-        depth_ = self.get_coord("depth")
+        vert_coord = _get_vertical_coord_name(self._obj)
+        depth_ = self.get_coord(vert_coord)
         lat_ = self.get_coord("latitude")
         lon_ = self.get_coord("longitude")
         depth, lat, lon = np.meshgrid(depth_, lat_, lon_, indexing="ij")
@@ -485,3 +486,18 @@ coord_aliases["depth"] = ["depth"]
 def open_dataset(file, *args, **kwargs):
     file = _dm.validate_file(file)
     return xr.open_dataset(file, *args, **kwargs)
+
+
+def _get_vertical_coord_name(x: Union[xr.DataArray, xr.Dataset]) -> str:
+    the_vert = None
+    for dim in x.dims:
+        if dim not in coord_aliases["latitude"] + coord_aliases["longitude"]:
+            the_vert = dim
+    if the_vert is None:
+        raise ValueError("Could not determine vertical coordinate.")
+    return the_vert
+
+
+def _get_vertical_coord(x: Union[xr.DataArray, xr.Dataset]):
+    vert_name = _get_vertical_coord_name(x)
+    return getattr(x, vert_name)

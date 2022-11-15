@@ -5,6 +5,7 @@
 import os
 
 import geopandas as gpd
+import numpy as np
 import pytest
 import xarray as xr
 
@@ -50,6 +51,9 @@ def test_profile_extraction(on_disk_nc_file):
     assert profiles.profiles.shape[0] == gridsize
     assert profiles.profiles.shape[1] == ds.coords["depth"].size
 
+    profiles = ds.profiler.get_profiles("Q", vertical_mask=range(0, 10))
+    assert profiles.profiles.shape[1] == 10
+
     # get profiles inside, outside some bounds
     df = geo_df_for_testing()
     dfl = [
@@ -65,6 +69,11 @@ def test_profile_extraction(on_disk_nc_file):
     assert n_out < gridsize
     assert n_in < gridsize
     assert n_in + n_out == gridsize
+
+    profiles = ds.profiler.get_profiles(
+        "Q", df_gpds=dfl, drop_null=True, vertical_mask=range(0, 10)
+    )
+    assert profiles.profiles.shape[1] == 10
 
 
 def test_filter_surface_gpd(on_disk_nc_file):
@@ -111,3 +120,16 @@ def test_interpolate_to_cartesian(on_disk_nc_file):
     )
     assert hasattr(ds_yt, "sphere")
     assert ("stream", "dvs") in ds_yt.field_list
+
+
+def test_vertical_coord(on_disk_nc_file):
+    ds = ytgeotools.open_dataset(on_disk_nc_file)
+    nme = ytgeotools.ytgeotools._get_vertical_coord_name(ds)
+    assert nme == "depth"
+    nme = ytgeotools.ytgeotools._get_vertical_coord_name(ds.Q)
+    assert nme == "depth"
+
+    depth = ytgeotools.ytgeotools._get_vertical_coord(ds)
+    assert np.all(depth == ds.depth)
+    depth = ytgeotools.ytgeotools._get_vertical_coord(ds.Q)
+    assert np.all(depth == ds.depth)
